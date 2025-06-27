@@ -9,6 +9,7 @@ class BusTrip {
   final int busId;
   final String busFleetType;
   final String busPlate;
+  final String? busIdStatusName; // Added busIdStatusName
   final String tripDate;
   final int totalSeat;
   final int seatBooked;
@@ -46,6 +47,7 @@ class BusTrip {
     required this.userId,
     this.statusSeq,
     this.routeLineIds,
+    this.busIdStatusName,
   });
 
   factory BusTrip.fromJson(Map<String, dynamic> json) {
@@ -57,6 +59,7 @@ class BusTrip {
       busId: int.tryParse(json['bus_id']?.toString() ?? '') ?? 0,
       busFleetType: json['bus_fleet_type']?.toString() ?? '',
       busPlate: json['bus_plate']?.toString() ?? '',
+      busIdStatusName: json['bus_id_status_name']?.toString(),
       tripDate: json['trip_date']?.toString() ?? '',
       totalSeat: int.tryParse(json['total_seat']?.toString() ?? '') ?? 0,
       seatBooked: int.tryParse(json['booked_seat']?.toString() ?? '') ?? 0,

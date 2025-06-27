@@ -50,7 +50,7 @@ class BusTripDetailScreen extends StatelessWidget {
             backgroundColor: kPrimaryBlue,
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
-                trip.routeName,
+                trip.name,
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -66,7 +66,10 @@ class BusTripDetailScreen extends StatelessWidget {
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [kPrimaryBlue, kPrimaryBlue.withAlpha(204)], // 0.8 * 255 = 204
+                        colors: [
+                          kPrimaryBlue,
+                          kPrimaryBlue.withAlpha(204),
+                        ], // 0.8 * 255 = 204
                       ),
                     ),
                   ),
@@ -79,7 +82,9 @@ class BusTripDetailScreen extends StatelessWidget {
                       height: 200,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: kAccentGold.withAlpha(26), // 0.1 * 255 = 25.5 ≈ 26
+                        color: kAccentGold.withAlpha(
+                          26,
+                        ), // 0.1 * 255 = 25.5 ≈ 26
                       ),
                     ),
                   ),
@@ -435,7 +440,9 @@ class BusTripDetailScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: kPrimaryBlue.withAlpha(13), // 0.05 * 255 = 12.75 ≈ 13
+                    color: kPrimaryBlue.withAlpha(
+                      13,
+                    ), // 0.05 * 255 = 12.75 ≈ 13
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -452,7 +459,7 @@ class BusTripDetailScreen extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  SizedBox(height: responsiveFont(20, context)),
+                  SizedBox(height: responsiveFont(2, context)),
                   ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -466,8 +473,14 @@ class BusTripDetailScreen extends StatelessWidget {
                         alignment: TimelineAlign.start,
                         isFirst: isFirst,
                         isLast: isLast,
-                        beforeLineStyle: const LineStyle(color: kAccentGold, thickness: 2),
-                        afterLineStyle: const LineStyle(color: kAccentGold, thickness: 2),
+                        beforeLineStyle: const LineStyle(
+                          color: kAccentGold,
+                          thickness: 2,
+                        ),
+                        afterLineStyle: const LineStyle(
+                          color: kAccentGold,
+                          thickness: 2,
+                        ),
                         indicatorStyle: IndicatorStyle(
                           width: responsiveFont(30, context),
                           height: responsiveFont(30, context),
@@ -510,12 +523,16 @@ class BusTripDetailScreen extends StatelessWidget {
                                   color: kSlateGray,
                                 ),
                               ),
-                              Text(
-                                'Route ID: ${routeLine.id ?? "N/A"}',
-                                style: TextStyle(
-                                  fontSize: responsiveFont(14, context),
-                                  color: kSlateGray,
-                                ),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Route ID: ${routeLine.id ?? "N/A"}',
+                                    style: TextStyle(
+                                      fontSize: responsiveFont(14, context),
+                                      color: kSlateGray,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -597,7 +614,48 @@ class BusTripDetailScreen extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: responsiveFont(16, context)),
+          SizedBox(height: responsiveFont(20, context)),
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(responsiveFont(12, context)),
+                decoration: BoxDecoration(
+                  color: kSoftGold.withAlpha(26),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.info_outline_rounded,
+                  color: kSoftGold,
+                  size: responsiveFont(24, context),
+                ),
+              ),
+              SizedBox(width: responsiveFont(16, context)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bus Status',
+                      style: TextStyle(
+                        color: kSlateGray,
+                        fontSize: responsiveFont(14, context),
+                      ),
+                    ),
+                    SizedBox(height: responsiveFont(4, context)),
+                    Text(
+                      trip.busIdStatusName ?? 'N/A',
+                      style: TextStyle(
+                        color: kPrimaryBlue,
+                        fontSize: responsiveFont(18, context),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: responsiveFont(20, context)),
           Row(
             children: [
               Container(
