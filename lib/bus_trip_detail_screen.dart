@@ -523,17 +523,6 @@ class BusTripDetailScreen extends StatelessWidget {
                                   color: kSlateGray,
                                 ),
                               ),
-                              Row(
-                                children: [
-                                  Text(
-                                    'Route ID: ${routeLine.id ?? "N/A"}',
-                                    style: TextStyle(
-                                      fontSize: responsiveFont(14, context),
-                                      color: kSlateGray,
-                                    ),
-                                  ),
-                                ],
-                              ),
                             ],
                           ),
                         ),

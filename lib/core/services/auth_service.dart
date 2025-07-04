@@ -8,8 +8,15 @@ class AuthService {
   static const String _sessionIdKey = 'session_id';
   static const String _userProfileKey = 'user_profile';
   static const String _userIdKey = 'user_id';
+  static const String _usernameKey = 'username';
+  static const String _passwordKey = 'password';
 
   String? get sessionId => _sessionId;
+  String? _username;
+  String? _password;
+
+  String? get username => _username;
+  String? get password => _password;
 
   // Get user ID
   Future<String?> getUserId() async {
@@ -43,7 +50,10 @@ class AuthService {
   Future<void> initializeSession() async {
     final prefs = await SharedPreferences.getInstance();
     _sessionId = prefs.getString(_sessionIdKey);
+    _username = prefs.getString(_usernameKey);
+    _password = prefs.getString(_passwordKey);
   }
+
 
   // Save session to SharedPreferences
   Future<void> _saveSession(String sessionId) async {
@@ -58,7 +68,11 @@ class AuthService {
     await prefs.remove(_sessionIdKey);
     await prefs.remove(_userProfileKey);
     await prefs.remove(_userIdKey);
+    await prefs.remove(_usernameKey);
+    await prefs.remove(_passwordKey);
     _sessionId = null;
+    _username = null;
+    _password = null;
   }
 
   Future<Map<String, dynamic>> login(String username, String password) async {
@@ -131,6 +145,13 @@ class AuthService {
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
         if (responseData['status'] == true) {
+          // Save username and password
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_usernameKey, username);
+          await prefs.setString(_passwordKey, password);
+          _username = username;
+          _password = password;
+
           final String? jobTitle =
               responseData['data']['employee']?['job_title'];
           String userRole = 'unknown';

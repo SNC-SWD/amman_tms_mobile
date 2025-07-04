@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'routes_screen.dart' as routes;
 import 'profile_screen.dart' as profile;
 import 'home_screen.dart';
+import 'screens/multi_bus_map_screen.dart' as map_screen;
 
 const kPrimaryBlue = Color(0xFF163458);
 const kAccentGold = Color(0xFFC88C2C);
@@ -37,6 +38,7 @@ class _MainScreenState extends State<MainScreen> {
         userRole: widget.userRole,
         busName: widget.busName,
       ),
+      map_screen.MultiBusMapScreen(),
       profile.ProfileScreen(onLogout: widget.onLogout),
     ];
   }
@@ -68,6 +70,11 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.route_outlined),
             selectedIcon: Icon(Icons.route, color: kAccentGold),
             label: 'Route',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.map_outlined),
+            selectedIcon: Icon(Icons.map, color: kAccentGold),
+            label: 'Map',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

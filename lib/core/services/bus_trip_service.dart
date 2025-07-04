@@ -33,8 +33,8 @@ class BusTripService {
           "jsonrpc": "2.0",
           "params": {
             "db": "odoo17_copy_experiment",
-            "login": "naufal@satnetcom.com",
-            "password": "Odoo2024!",
+            "login": _authService.username,
+            "password": _authService.password,
           },
         }),
       );
@@ -84,22 +84,35 @@ class BusTripService {
 
       String? sessionId = await _getSessionId();
 
-      if (sessionId == null) {
+      // direct reAuthenticate
+      final reAuthSuccess = await _reAuthenticate();
+      if (!reAuthSuccess) {
         print(
-          '⚠️ [BusTripService] No sessionId found, attempting re-authentication',
+          '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
         );
-        final reAuthSuccess = await _reAuthenticate();
-        if (!reAuthSuccess) {
-          print(
-            '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
-          );
-          return {
-            'status': false,
-            'message': 'Authentication failed. Please login again.',
-          };
-        }
-        sessionId = _sessionId;
+        return {
+          'status': false,
+          'message': 'Authentication failed. Please login again.',
+        };
       }
+      sessionId = _sessionId;
+
+      // if (sessionId == null) {
+      //   print(
+      //     '⚠️ [BusTripService] No sessionId found, attempting re-authentication',
+      //   );
+      //   final reAuthSuccess = await _reAuthenticate();
+      //   if (!reAuthSuccess) {
+      //     print(
+      //       '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
+      //     );
+      //     return {
+      //       'status': false,
+      //       'message': 'Authentication failed. Please login again.',
+      //     };
+      //   }
+      //   sessionId = _sessionId;
+      // }
 
       final Map<String, String> queryParams = {};
       if (busId != null && busId.isNotEmpty) queryParams['bus_id'] = busId;
@@ -206,23 +219,36 @@ class BusTripService {
       // Get sessionId from AuthService's local storage
       String? sessionId = await _getSessionId();
 
-      // If no sessionId, try to re-authenticate
-      if (sessionId == null) {
+      // direct reAuthenticate
+      final reAuthSuccess = await _reAuthenticate();
+      if (!reAuthSuccess) {
         print(
-          '⚠️ [BusTripService] No sessionId found, attempting re-authentication',
+          '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
         );
-        final reAuthSuccess = await _reAuthenticate();
-        if (!reAuthSuccess) {
-          print(
-            '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
-          );
-          return {
-            'status': false,
-            'message': 'Authentication failed. Please login again.',
-          };
-        }
-        sessionId = _sessionId;
+        return {
+          'status': false,
+          'message': 'Authentication failed. Please login again.',
+        };
       }
+      sessionId = _sessionId;
+
+      // If no sessionId, try to re-authenticate
+      // if (sessionId == null) {
+      //   print(
+      //     '⚠️ [BusTripService] No sessionId found, attempting re-authentication',
+      //   );
+      //   final reAuthSuccess = await _reAuthenticate();
+      //   if (!reAuthSuccess) {
+      //     print(
+      //       '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
+      //     );
+      //     return {
+      //       'status': false,
+      //       'message': 'Authentication failed. Please login again.',
+      //     };
+      //   }
+      //   sessionId = _sessionId;
+      // }
 
       // Step 1: Call /bus/wizard
       final wizardUri = Uri.parse('${ApiConfig.baseUrl}/bus/wizard');

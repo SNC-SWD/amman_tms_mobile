@@ -33,8 +33,8 @@ class BusPointService {
           "jsonrpc": "2.0",
           "params": {
             "db": "odoo17_copy_experiment",
-            "login": "naufal@satnetcom.com",
-            "password": "Odoo2024!",
+            "login": _authService.username,
+            "password": _authService.password,
           },
         }),
       );
@@ -76,24 +76,18 @@ class BusPointService {
     try {
       print('📍 [BusPointService] Fetching bus points');
 
-      String? sessionId = await _getSessionId();
-
-      if (sessionId == null) {
+      // Ensure session is valid before making API call
+      final reAuthSuccess = await _reAuthenticate();
+      if (!reAuthSuccess) {
         print(
-          '⚠️ [BusPointService] No sessionId found, attempting re-authentication',
+          '❌ [BusPointService] Re-authentication failed, cannot proceed with request',
         );
-        final reAuthSuccess = await _reAuthenticate();
-        if (!reAuthSuccess) {
-          print(
-            '❌ [BusPointService] Re-authentication failed, cannot proceed with request',
-          );
-          return {
-            'status': false,
-            'message': 'Authentication failed. Please login again.',
-          };
-        }
-        sessionId = _sessionId;
+        return {
+          'status': false,
+          'message': 'Authentication failed. Please login again.',
+        };
       }
+      String? sessionId = _sessionId;
 
       final Uri uri = Uri.parse(
         '${ApiConfig.baseUrl}${ApiConfig.getBusPoints}',

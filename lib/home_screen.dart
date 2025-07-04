@@ -58,6 +58,16 @@ class _HomeScreenState extends State<HomeScreen> {
   static List<BusTrip>? _cachedRoutes;
   static DateTime? _cachedRoutesTime;
   static const Duration _routesCacheDuration = Duration(minutes: 5);
+  
+  // Cache variables for assigned bus
+  static Map<String, dynamic>? _cachedAssignedBus;
+  static DateTime? _cachedAssignedBusTime;
+  static const Duration _assignedBusCacheDuration = Duration(minutes: 5);
+  
+  // Cache variables for supervisor stats
+  static Map<String, int>? _cachedStats;
+  static DateTime? _cachedStatsTime;
+  static const Duration _statsCacheDuration = Duration(minutes: 5);
 
   List<Map<String, dynamic>> _recentPlanTrips = [];
   bool _isLoadingPlanTrips = true;
@@ -151,10 +161,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadRoutesToConfirm() async {
+    // Check cache first
+    if (_cachedRoutes != null && _cachedRoutesTime != null) {
+      final now = DateTime.now();
+      if (now.difference(_cachedRoutesTime!) < _routesCacheDuration) {
+        print('🔄 [HomeScreen] Using cached routes to confirm');
+        setState(() {
+          _routesToConfirm = _cachedRoutes!;
+          _isLoadingRoutes = false;
+        });
+        print('✅ [HomeScreen] Routes cache used, loading false');
+        return;
+      }
+    }
+    
     setState(() {
       _isLoadingRoutes = true;
       _routeErrorMessage = null;
     });
+    print('🔄 [HomeScreen] Start loading routes from API');
+    
     try {
       final userId = await _authService.getUserId();
       if (userId == null) {
@@ -181,9 +207,16 @@ class _HomeScreenState extends State<HomeScreen> {
           newRoutes = routesData
               .map<BusTrip>((route) => BusTrip.fromJson(route))
               .toList();
+              
+          // Update cache
+          _cachedRoutes = newRoutes;
+          _cachedRoutesTime = DateTime.now();
         } else {
           setState(() {
             _routeErrorMessage = result['message'];
+            // Clear cache on error to prevent showing stale data
+            _cachedRoutes = null;
+            _cachedRoutesTime = null;
           });
           return;
         }
@@ -193,10 +226,15 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _routesToConfirm = newRoutes;
       });
+      print('✅ [HomeScreen] Routes API success, loading false');
     } catch (e) {
       setState(() {
         _routeErrorMessage = 'Failed to load routes: $e';
+        // Clear cache on error to prevent showing stale data
+        _cachedRoutes = null;
+        _cachedRoutesTime = null;
       });
+      print('❌ [HomeScreen] Routes Exception, loading false');
     } finally {
       setState(() {
         _isLoadingRoutes = false;
@@ -231,6 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final result = await _busTripService.getBusTrips(
         startDate: today,
         endDate: today,
+        busStatusSeq: widget.userRole == 'passenger' ? '2' : null,
       );
 
       if (!mounted) return;
@@ -277,10 +316,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadAssignedBus() async {
+    // Check cache first
+    if (_cachedAssignedBus != null && _cachedAssignedBusTime != null) {
+      final now = DateTime.now();
+      if (now.difference(_cachedAssignedBusTime!) < _assignedBusCacheDuration) {
+        print('🔄 [HomeScreen] Using cached assigned bus');
+        setState(() {
+          _assignedBus = _cachedAssignedBus;
+          _isLoadingBus = false;
+        });
+        print('✅ [HomeScreen] Assigned bus cache used, loading false');
+        return;
+      }
+    }
+    
     setState(() {
       _isLoadingBus = true;
       _busErrorMessage = null;
     });
+    print('🔄 [HomeScreen] Start loading assigned bus from API');
 
     try {
       final userId = await _authService.getUserId();
@@ -296,6 +350,10 @@ class _HomeScreenState extends State<HomeScreen> {
       if (result['status'] == true) {
         final List<dynamic> busData = result['data'];
         if (busData.isNotEmpty) {
+          // Update cache
+          _cachedAssignedBus = busData[0];
+          _cachedAssignedBusTime = DateTime.now();
+          
           setState(() {
             _assignedBus = busData[0];
           });
@@ -303,12 +361,20 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         setState(() {
           _busErrorMessage = result['message'];
+          // Clear cache on error to prevent showing stale data
+          _cachedAssignedBus = null;
+          _cachedAssignedBusTime = null;
         });
       }
+      print('✅ [HomeScreen] Assigned bus API success, loading false');
     } catch (e) {
       setState(() {
         _busErrorMessage = 'Failed to load assigned bus: $e';
+        // Clear cache on error to prevent showing stale data
+        _cachedAssignedBus = null;
+        _cachedAssignedBusTime = null;
       });
+      print('❌ [HomeScreen] Assigned bus Exception, loading false');
     } finally {
       setState(() {
         _isLoadingBus = false;
@@ -347,12 +413,20 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         setState(() {
           _planTripErrorMessage = result['message'];
+          // Clear cache on error to prevent showing stale data
+          _cachedPlanTrips = null;
+          _cachedPlanTripsTime = null;
         });
       }
+      print('✅ [HomeScreen] Plan trips API success, loading false');
     } catch (e) {
       setState(() {
         _planTripErrorMessage = 'Failed to load plan trips: $e';
+        // Clear cache on error to prevent showing stale data
+        _cachedPlanTrips = null;
+        _cachedPlanTripsTime = null;
       });
+      print('❌ [HomeScreen] Plan trips Exception, loading false');
     } finally {
       setState(() {
         _isLoadingPlanTrips = false;
@@ -361,7 +435,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadSupervisorStats() async {
+    // Check cache first
+    if (_cachedStats != null && _cachedStatsTime != null) {
+      final now = DateTime.now();
+      if (now.difference(_cachedStatsTime!) < _statsCacheDuration) {
+        print('🔄 [HomeScreen] Using cached supervisor stats');
+        setState(() {
+          _totalRoutes = _cachedStats!['totalRoutes'] ?? 0;
+          _activeBuses = _cachedStats!['activeBuses'] ?? 0;
+          _todaysTrips = _cachedStats!['todaysTrips'] ?? 0;
+          _totalPassengers = _cachedStats!['totalPassengers'] ?? 0;
+          _isLoadingStats = false;
+        });
+        print('✅ [HomeScreen] Stats cache used, loading false');
+        return;
+      }
+    }
+    
     setState(() => _isLoadingStats = true);
+    print('🔄 [HomeScreen] Start loading supervisor stats from API');
+    
     try {
       // Total Routes
       final routeResult = await _routeService.getRoutes();
@@ -396,11 +489,26 @@ class _HomeScreenState extends State<HomeScreen> {
         _todaysTrips = 0;
         _totalPassengers = 0;
       }
+      
+      // Update cache
+      _cachedStats = {
+        'totalRoutes': _totalRoutes,
+        'activeBuses': _activeBuses,
+        'todaysTrips': _todaysTrips,
+        'totalPassengers': _totalPassengers,
+      };
+      _cachedStatsTime = DateTime.now();
+      print('✅ [HomeScreen] Supervisor stats API success, loading false');
     } catch (e) {
       _totalRoutes = 0;
       _activeBuses = 0;
       _todaysTrips = 0;
       _totalPassengers = 0;
+      
+      // Clear cache on error
+      _cachedStats = null;
+      _cachedStatsTime = null;
+      print('❌ [HomeScreen] Supervisor stats Exception, loading false');
     } finally {
       if (mounted) setState(() => _isLoadingStats = false);
     }
@@ -467,20 +575,35 @@ class _HomeScreenState extends State<HomeScreen> {
       child: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
+            // Clear cache for all roles so refresh always fetches new data
+            _cachedTrips = null;
+            _cachedTime = null;
+            _cachedRoutes = null;
+            _cachedRoutesTime = null;
+            _cachedPlanTrips = null;
+            _cachedPlanTripsTime = null;
+            _cachedAssignedBus = null;
+            _cachedAssignedBusTime = null;
+            _cachedStats = null;
+            _cachedStatsTime = null;
+            
+            print('🔄 [HomeScreen] Refresh: All caches cleared');
+            
             if (widget.userRole == 'supervisor') {
-              // Clear cache so refresh always fetches new data
-              _cachedTrips = null;
-              _cachedTime = null;
+              print('🔄 [HomeScreen] Refresh: Loading supervisor data');
               await Future.wait([
                 _loadSupervisorStats(),
                 _loadRecentBusTrips(),
                 _loadRecentPlanTrips(),
               ]);
             } else if (widget.userRole == 'driver') {
+              print('🔄 [HomeScreen] Refresh: Loading driver data');
               await Future.wait([_loadRoutesToConfirm(), _loadAssignedBus()]);
             } else if (widget.userRole == 'passenger') {
+              print('🔄 [HomeScreen] Refresh: Loading passenger data');
               await _loadRecentBusTrips();
             }
+            print('✅ [HomeScreen] Refresh completed');
           },
           color: kAccentGold,
           child: SingleChildScrollView(

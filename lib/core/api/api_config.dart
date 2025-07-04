@@ -1,5 +1,6 @@
 class ApiConfig {
   static const String baseUrl = 'http://rnd3.satnetcom.com:8069/api';
+  static const String baseUrlTraccar = 'http://203.80.13.234:8099/api';
   static const String loginEndpoint = '/auth/login';
   static const String connectionEndpoint =
       'http://rnd3.satnetcom.com:8069/web/session/authenticate';

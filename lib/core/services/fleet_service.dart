@@ -34,10 +34,8 @@ class FleetService {
           "jsonrpc": "2.0",
           "params": {
             "db": "odoo17_copy_experiment",
-            "login":
-                "naufal@satnetcom.com", // You might want to store these credentials securely
-            "password":
-                "Odoo2024!", // You might want to store these credentials securely
+            "login": _authService.username,
+            "password": _authService.password,
           },
         }),
       );
@@ -87,26 +85,18 @@ class FleetService {
         '🚌 [FleetService] Fetching fleets with params: type=$fleetType, name=$fleetName, driver=$driverName, status=$statusName',
       );
 
-      // Get sessionId from AuthService's local storage
-      String? sessionId = await _getSessionId();
-
-      // If no sessionId, try to re-authenticate
-      if (sessionId == null) {
+      // Ensure session is valid before making API call
+      final reAuthSuccess = await _reAuthenticate();
+      if (!reAuthSuccess) {
         print(
-          '⚠️ [FleetService] No sessionId found, attempting re-authentication',
+          '❌ [FleetService] Re-authentication failed, cannot proceed with request',
         );
-        final reAuthSuccess = await _reAuthenticate();
-        if (!reAuthSuccess) {
-          print(
-            '❌ [FleetService] Re-authentication failed, cannot proceed with request',
-          );
-          return {
-            'status': false,
-            'message': 'Authentication failed. Please login again.',
-          };
-        }
-        sessionId = _sessionId;
+        return {
+          'status': false,
+          'message': 'Authentication failed. Please login again.',
+        };
       }
+      String? sessionId = _sessionId;
 
       final Uri uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.getFleets}')
           .replace(
@@ -189,26 +179,18 @@ class FleetService {
     try {
       print('🚌 [FleetService] Fetching assigned bus for driver: $driverId');
 
-      // Get sessionId from AuthService's local storage
-      String? sessionId = await _getSessionId();
-
-      // If no sessionId, try to re-authenticate
-      if (sessionId == null) {
+      // Ensure session is valid before making API call
+      final reAuthSuccess = await _reAuthenticate();
+      if (!reAuthSuccess) {
         print(
-          '⚠️ [FleetService] No sessionId found, attempting re-authentication',
+          '❌ [FleetService] Re-authentication failed, cannot proceed with request',
         );
-        final reAuthSuccess = await _reAuthenticate();
-        if (!reAuthSuccess) {
-          print(
-            '❌ [FleetService] Re-authentication failed, cannot proceed with request',
-          );
-          return {
-            'status': false,
-            'message': 'Authentication failed. Please login again.',
-          };
-        }
-        sessionId = _sessionId;
+        return {
+          'status': false,
+          'message': 'Authentication failed. Please login again.',
+        };
       }
+      String? sessionId = _sessionId;
 
       final Uri uri = Uri.parse(
         '${ApiConfig.baseUrl}${ApiConfig.getFleets}',
@@ -290,23 +272,18 @@ class FleetService {
       print(
         '🚦 [FleetService] Updating vehicle status for busId: $busId to statusSeq: $statusSeq',
       );
-      String? sessionId = await _getSessionId();
-      if (sessionId == null) {
+      // Ensure session is valid before making API call
+      final reAuthSuccess = await _reAuthenticate();
+      if (!reAuthSuccess) {
         print(
-          '⚠️ [FleetService] No sessionId found, attempting re-authentication',
+          '❌ [FleetService] Re-authentication failed, cannot proceed with request',
         );
-        final reAuthSuccess = await _reAuthenticate();
-        if (!reAuthSuccess) {
-          print(
-            '❌ [FleetService] Re-authentication failed, cannot proceed with request',
-          );
-          return {
-            'status': false,
-            'message': 'Authentication failed. Please login again.',
-          };
-        }
-        sessionId = _sessionId;
+        return {
+          'status': false,
+          'message': 'Authentication failed. Please login again.',
+        };
       }
+      String? sessionId = _sessionId;
       final Uri uri = Uri.parse('${ApiConfig.baseUrl}/vehicle/$busId/status');
       print('🌐 [FleetService] Making PATCH request to: ${uri.toString()}');
       final response = await http.patch(

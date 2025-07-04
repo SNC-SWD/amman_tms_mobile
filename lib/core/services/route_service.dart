@@ -47,8 +47,8 @@ class RouteService {
           "jsonrpc": "2.0",
           "params": {
             "db": "odoo17_copy_experiment",
-            "login": "naufal@satnetcom.com",
-            "password": "Odoo2024!",
+            "login": _authService.username,
+            "password": _authService.password,
           },
         }),
       );
@@ -97,24 +97,18 @@ class RouteService {
         '🛣️ [RouteService] Fetching routes${driverId != null ? ' for driver: $driverId' : ''}${page != null ? ' page: $page' : ''}',
       );
 
-      String? sessionId = await _getSessionId();
-
-      if (sessionId == null) {
+      // Ensure session is valid before making API call
+      final reAuthSuccess = await _reAuthenticate();
+      if (!reAuthSuccess) {
         print(
-          '⚠️ [RouteService] No sessionId found, attempting re-authentication',
+          '❌ [RouteService] Re-authentication failed, cannot proceed with request',
         );
-        final reAuthSuccess = await _reAuthenticate();
-        if (!reAuthSuccess) {
-          print(
-            '❌ [RouteService] Re-authentication failed, cannot proceed with request',
-          );
-          return {
-            'status': false,
-            'message': 'Authentication failed. Please login again.',
-          };
-        }
-        sessionId = _sessionId;
+        return {
+          'status': false,
+          'message': 'Authentication failed. Please login again.',
+        };
       }
+      String? sessionId = _sessionId;
 
       final Map<String, String> queryParams = {};
       if (driverId != null) {
