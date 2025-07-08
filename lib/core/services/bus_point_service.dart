@@ -8,7 +8,13 @@ class BusPointService {
   String? _sessionId;
 
   BusPointService({AuthService? authService})
-    : _authService = authService ?? AuthService();
+    : _authService = authService ?? AuthService() {
+    _initializeAuthService();
+  }
+
+  Future<void> _initializeAuthService() async {
+    await _authService.initializeSession();
+  }
 
   Future<String?> _getSessionId() async {
     await _authService.initializeSession();
@@ -100,7 +106,7 @@ class BusPointService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Cookie': 'session_id=$sessionId',
+          'Cookie': 'session_id=$_sessionId',
         },
       );
 

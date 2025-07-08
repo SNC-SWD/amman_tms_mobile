@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
-import 'login_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:amman_tms_mobile/screens/authentication/login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'splash_screen.dart';
-import 'main_screen.dart';
+import 'package:amman_tms_mobile/screens/authentication/splash_screen.dart';
+import 'package:amman_tms_mobile/screens/home/main_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   initializeDateFormatting('id_ID', null).then((_) {
     runApp(const MyApp());
   });

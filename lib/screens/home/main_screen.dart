@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'routes_screen.dart' as routes;
-import 'profile_screen.dart' as profile;
+import 'package:amman_tms_mobile/screens/route/routes_screen.dart' as routes;
+import 'package:amman_tms_mobile/screens/user/profile_screen.dart' as profile;
 import 'home_screen.dart';
-import 'screens/multi_bus_map_screen.dart' as map_screen;
+import 'package:amman_tms_mobile/screens/map/multi_bus_map_screen.dart'
+    as map_screen;
 
 const kPrimaryBlue = Color(0xFF163458);
 const kAccentGold = Color(0xFFC88C2C);

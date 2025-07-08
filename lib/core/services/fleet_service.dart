@@ -8,7 +8,13 @@ class FleetService {
   String? _sessionId;
 
   FleetService({AuthService? authService})
-    : _authService = authService ?? AuthService();
+    : _authService = authService ?? AuthService() {
+    _initializeAuthService();
+  }
+
+  Future<void> _initializeAuthService() async {
+    await _authService.initializeSession();
+  }
 
   Future<String?> _getSessionId() async {
     // Get sessionId from AuthService's local storage
@@ -96,7 +102,6 @@ class FleetService {
           'message': 'Authentication failed. Please login again.',
         };
       }
-      String? sessionId = _sessionId;
 
       final Uri uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.getFleets}')
           .replace(
@@ -115,7 +120,7 @@ class FleetService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Cookie': 'session_id=$sessionId',
+          'Cookie': 'session_id=$_sessionId',
         },
       );
 
@@ -190,7 +195,7 @@ class FleetService {
           'message': 'Authentication failed. Please login again.',
         };
       }
-      String? sessionId = _sessionId;
+      final String? sessionId = _sessionId;
 
       final Uri uri = Uri.parse(
         '${ApiConfig.baseUrl}${ApiConfig.getFleets}',
@@ -283,7 +288,7 @@ class FleetService {
           'message': 'Authentication failed. Please login again.',
         };
       }
-      String? sessionId = _sessionId;
+      final String? sessionId = _sessionId;
       final Uri uri = Uri.parse('${ApiConfig.baseUrl}/vehicle/$busId/status');
       print('🌐 [FleetService] Making PATCH request to: ${uri.toString()}');
       final response = await http.patch(

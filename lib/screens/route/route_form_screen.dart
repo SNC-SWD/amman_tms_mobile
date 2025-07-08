@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'models/route_line.dart' as model_route_line;
+import 'package:amman_tms_mobile/models/route_line.dart' as model_route_line;
+
 import 'routes_screen.dart' as routes;
-import 'core/services/fleet_service.dart';
-import 'core/services/bus_point_service.dart';
-import 'models/fleet.dart';
-import 'models/bus_point.dart';
-import 'core/services/route_service.dart';
+import 'package:amman_tms_mobile/core/services/fleet_service.dart';
+import 'package:amman_tms_mobile/core/services/bus_point_service.dart';
+import 'package:amman_tms_mobile/models/fleet.dart';
+import 'package:amman_tms_mobile/models/bus_point.dart';
+import 'package:amman_tms_mobile/core/services/route_service.dart';
 
 const kPrimaryBlue = Color(0xFF163458);
 const kAccentGold = Color(0xFFC88C2C);

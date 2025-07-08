@@ -1,6 +1,70 @@
 import 'package:flutter/material.dart';
 import 'package:timeline_tile/timeline_tile.dart';
-import 'models/bus_trip.dart';
+import 'package:amman_tms_mobile/models/bus_trip.dart';
+
+// Asumsikan model ini ada di 'models/bus_trip.dart' atau file terpisah.
+// --- MULAI PENAMBAHAN MODEL BARU ---
+class TripChatter {
+  final int tripId;
+  final String tripName;
+  final List<ChatterMessage> chatter;
+
+  TripChatter({
+    required this.tripId,
+    required this.tripName,
+    required this.chatter,
+  });
+
+  factory TripChatter.fromJson(Map<String, dynamic> json) {
+    var chatterList = json['chatter'] as List;
+    List<ChatterMessage> messages = chatterList
+        .map((i) => ChatterMessage.fromJson(i))
+        .toList();
+    return TripChatter(
+      tripId: json['trip_id'],
+      tripName: json['trip_name'],
+      chatter: messages,
+    );
+  }
+}
+
+class ChatterMessage {
+  final int id;
+  final String date;
+  final String author;
+  final String body;
+  final String subtype;
+  final String type;
+
+  ChatterMessage({
+    required this.id,
+    required this.date,
+    required this.author,
+    required this.body,
+    required this.subtype,
+    required this.type,
+  });
+
+  factory ChatterMessage.fromJson(Map<String, dynamic> json) {
+    return ChatterMessage(
+      id: json['id'],
+      date: json['date'],
+      author: json['author'],
+      body: json['body'],
+      subtype: json['subtype'],
+      type: json['type'],
+    );
+  }
+
+  // Helper untuk membersihkan HTML dari body
+  String get cleanedBody {
+    // final document = parse(body);
+    // final String? parsedString = document.body?.text;
+    // return parsedString ?? body;
+    return body;
+  }
+}
+// --- AKHIR PENAMBAHAN MODEL BARU ---
 
 const kPrimaryBlue = Color(0xFF163458);
 const kAccentGold = Color(0xFFC88C2C);
@@ -11,8 +75,50 @@ const kBlueTint = Color(0xFFE6EDF6);
 
 class BusTripDetailScreen extends StatelessWidget {
   final BusTrip trip;
+  // --- MULAI PENAMBAHAN DATA LOG ---
+  // Data log di-hardcode untuk tujuan demo, idealnya ini akan datang dari API.
+  final TripChatter tripLogHistory = TripChatter.fromJson({
+    "trip_id": 91,
+    "trip_name": "TR091",
+    "chatter": [
+      {
+        "id": 55144,
+        "date": "2025-07-04 07:02:49",
+        "author": "Muhammad Naufal",
+        "body": "<p>Bus trip created</p>",
+        "subtype": "Note",
+        "type": "notification",
+      },
+      {
+        "id": 55145,
+        "date": "2025-07-04 07:22:49",
+        "author": "Muhammad Naufal",
+        "body": "state: Ready → Trip Confirmed",
+        "subtype": "Note",
+        "type": "notification",
+      },
+      {
+        "id": 55146,
+        "date": "2025-07-04 08:09:06",
+        "author": "Bayu Hadi Sudrajat",
+        "body": "<p>Start trip late at 16:09:06 ☹ (diff: -11:09:06)</p>",
+        "subtype": "Note",
+        "type": "notification",
+      },
+      {
+        "id": 55147,
+        "date": "2025-07-04 08:09:07",
+        "author": "Bayu Hadi Sudrajat",
+        "body":
+            "state: Trip Confirmed → On Trip | trip_status_summary: - → Start Trip - Late",
+        "subtype": "Note",
+        "type": "notification",
+      },
+    ],
+  });
+  // --- AKHIR PENAMBAHAN DATA LOG ---
 
-  const BusTripDetailScreen({super.key, required this.trip});
+  BusTripDetailScreen({super.key, required this.trip});
 
   // Responsive helpers
   double responsiveFont(double base, BuildContext context) {
@@ -125,6 +231,11 @@ class BusTripDetailScreen extends StatelessWidget {
                   SizedBox(height: responsiveFont(24, context)),
                   // Passenger Stats
                   _buildPassengerStats(context),
+                  SizedBox(height: responsiveFont(24, context)),
+                  // --- MULAI PENAMBAHAN SECTION BARU ---
+                  // Trip Log History
+                  _buildTripLogHistory(context),
+                  // --- AKHIR PENAMBAHAN SECTION BARU ---
                 ],
               ),
             ),
@@ -134,6 +245,7 @@ class BusTripDetailScreen extends StatelessWidget {
     );
   }
 
+  // ... (Widget _buildStatusCard, _buildInfoCard, dll tetap sama)
   Widget _buildStatusCard(BuildContext context) {
     // Status logic - following the same logic as other screens
     int statusSeq = trip.statusSeq ?? 0;
@@ -563,6 +675,8 @@ class BusTripDetailScreen extends StatelessWidget {
             ),
           ),
           SizedBox(height: responsiveFont(20, context)),
+          _buildPunctualityStatus(context),
+          SizedBox(height: responsiveFont(20, context)),
           Row(
             children: [
               Container(
@@ -786,6 +900,197 @@ class BusTripDetailScreen extends StatelessWidget {
               fontSize: responsiveFont(20, context),
               fontWeight: FontWeight.bold,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPunctualityStatus(BuildContext context) {
+    String statusText;
+    Color statusColor;
+
+    switch (trip.punctualityStatus) {
+      case 0:
+        statusText = 'Start Trip - On Time';
+        statusColor = Colors.green;
+        break;
+      case 1:
+        statusText = 'Start Trip - Late';
+        statusColor = Colors.red;
+        break;
+      case 2:
+        statusText = 'End Trip - On Time';
+        statusColor = Colors.green;
+        break;
+      case 3:
+        statusText = 'End Trip - Late';
+        statusColor = Colors.red;
+        break;
+      default:
+        statusText = 'Punctuality status not available';
+        statusColor = Colors.grey;
+        break;
+    }
+
+    return Row(
+      children: [
+        Container(
+          padding: EdgeInsets.all(responsiveFont(12, context)),
+          decoration: BoxDecoration(
+            color: statusColor.withAlpha(26),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            Icons.access_time_rounded,
+            color: statusColor,
+            size: responsiveFont(24, context),
+          ),
+        ),
+        SizedBox(width: responsiveFont(16, context)),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Punctuality Status',
+                style: TextStyle(
+                  color: kSlateGray,
+                  fontSize: responsiveFont(14, context),
+                ),
+              ),
+              SizedBox(height: responsiveFont(4, context)),
+              Text(
+                statusText,
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: responsiveFont(18, context),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // --- WIDGET BARU: TRIP LOG HISTORY ---
+  Widget _buildTripLogHistory(BuildContext context) {
+    // Balikkan daftar untuk menampilkan log terbaru di atas
+    final reversedChatter = tripLogHistory.chatter.reversed.toList();
+
+    return Container(
+      padding: EdgeInsets.all(responsiveFont(20, context)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: kPrimaryBlue.withAlpha(13), // 0.05 * 255 = 12.75 ≈ 13
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Trip Log History',
+            style: TextStyle(
+              color: kPrimaryBlue,
+              fontSize: responsiveFont(18, context),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: responsiveFont(16, context)),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: reversedChatter.length,
+            itemBuilder: (context, index) {
+              final log = reversedChatter[index];
+              final isFirst = index == 0;
+              final isLast = index == reversedChatter.length - 1;
+
+              return TimelineTile(
+                alignment: TimelineAlign.start,
+                isFirst: isFirst,
+                isLast: isLast,
+                beforeLineStyle: LineStyle(color: kBlueTint, thickness: 2),
+                indicatorStyle: IndicatorStyle(
+                  width: responsiveFont(24, context),
+                  height: responsiveFont(24, context),
+                  padding: const EdgeInsets.all(6),
+                  indicator: Container(
+                    decoration: BoxDecoration(
+                      color: kBlueTint,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Icon(
+                        isFirst ? Icons.history_toggle_off : Icons.circle,
+                        size: responsiveFont(12, context),
+                        color: kPrimaryBlue,
+                      ),
+                    ),
+                  ),
+                ),
+                endChild: Padding(
+                  padding: EdgeInsets.only(
+                    left: responsiveFont(16, context),
+                    top: responsiveFont(8, context),
+                    bottom: responsiveFont(8, context),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        log.cleanedBody, // Gunakan body yang sudah dibersihkan
+                        style: TextStyle(
+                          fontSize: responsiveFont(15, context),
+                          color: kSlateGray,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(height: responsiveFont(6, context)),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.person,
+                            size: responsiveFont(12, context),
+                            color: Colors.grey,
+                          ),
+                          SizedBox(width: responsiveFont(4, context)),
+                          Text(
+                            log.author,
+                            style: TextStyle(
+                              fontSize: responsiveFont(12, context),
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const Spacer(),
+                          Icon(
+                            Icons.access_time,
+                            size: responsiveFont(12, context),
+                            color: Colors.grey,
+                          ),
+                          SizedBox(width: responsiveFont(4, context)),
+                          Text(
+                            log.date,
+                            style: TextStyle(
+                              fontSize: responsiveFont(12, context),
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'core/services/bus_trip_service.dart';
-import 'models/bus_trip.dart';
+import 'package:amman_tms_mobile/core/services/bus_trip_service.dart';
+import 'package:amman_tms_mobile/models/bus_trip.dart';
 import 'bus_trip_detail_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -368,7 +368,7 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
                     decoration: InputDecoration(
                       hintText: 'Search by route, driver, or bus',
                       hintStyle: TextStyle(
-                        fontSize: responsiveFont(12, context),
+                        fontSize: responsiveFont(14, context),
                       ),
                       prefixIcon: Icon(
                         Icons.search,
@@ -377,7 +377,7 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
                       filled: true,
                       fillColor: Colors.white,
                       contentPadding: EdgeInsets.symmetric(
-                        vertical: responsiveFont(12, context),
+                        vertical: responsiveFont(14, context),
                         horizontal: responsiveFont(16, context),
                       ),
                       border: OutlineInputBorder(
@@ -389,7 +389,7 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
                     onChanged: _applySearch,
                   ),
                 ),
-                SizedBox(width: responsiveFont(12, context)),
+                SizedBox(width: responsiveFont(14, context)),
                 Material(
                   color: kAccentGold,
                   borderRadius: BorderRadius.circular(12),
@@ -397,7 +397,7 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
                     borderRadius: BorderRadius.circular(12),
                     onTap: _openFilterSheet,
                     child: Padding(
-                      padding: EdgeInsets.all(responsiveFont(12, context)),
+                      padding: EdgeInsets.all(responsiveFont(14, context)),
                       child: Icon(
                         Icons.filter_alt_rounded,
                         color: Colors.white,
@@ -576,7 +576,7 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
                                 _formatDate(trip.tripDate),
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: responsiveFont(12, context),
+                                  fontSize: responsiveFont(14, context),
                                   color: kPrimaryBlue,
                                   letterSpacing: 0.5,
                                 ),
@@ -594,7 +594,7 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
                                 '${trip.boardingPointName ?? ''} ',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: responsiveFont(12, context),
+                                  fontSize: responsiveFont(14, context),
                                   color: kAccentGold,
                                 ),
                                 overflow: TextOverflow.ellipsis,
@@ -611,7 +611,7 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
                                 ' ${trip.dropPointName ?? ''}',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: responsiveFont(12, context),
+                                  fontSize: responsiveFont(14, context),
                                   color: kPrimaryBlue,
                                 ),
                                 overflow: TextOverflow.ellipsis,
@@ -634,7 +634,7 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
                               style: TextStyle(
                                 color: Colors.green,
                                 fontWeight: FontWeight.w600,
-                                fontSize: responsiveFont(10, context),
+                                fontSize: responsiveFont(13, context),
                               ),
                             ),
                             SizedBox(width: responsiveFont(14, context)),
@@ -649,7 +649,7 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
                               style: TextStyle(
                                 color: Colors.red,
                                 fontWeight: FontWeight.w600,
-                                fontSize: responsiveFont(10, context),
+                                fontSize: responsiveFont(14, context),
                               ),
                             ),
                           ],
@@ -668,7 +668,7 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
                                 trip.userIdName ?? '',
                                 style: TextStyle(
                                   color: kSlateGray,
-                                  fontSize: responsiveFont(9, context),
+                                  fontSize: responsiveFont(14, context),
                                 ),
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
@@ -723,7 +723,7 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
                                         ? Colors.black
                                         : Colors.white,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: responsiveFont(9, context),
+                                    fontSize: responsiveFont(12, context),
                                     letterSpacing: 0.5,
                                   ),
                                 ),
@@ -747,7 +747,7 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
                                   style: TextStyle(
                                     color: kPrimaryBlue,
                                     fontWeight: FontWeight.w600,
-                                    fontSize: responsiveFont(9, context),
+                                    fontSize: responsiveFont(12, context),
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                   maxLines: 1,
@@ -771,7 +771,7 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
                                   Icon(
                                     Icons.groups_rounded,
                                     color: kSoftGold,
-                                    size: responsiveFont(12, context),
+                                    size: responsiveFont(14, context),
                                   ),
                                   SizedBox(width: responsiveFont(4, context)),
                                   Text(

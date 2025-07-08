@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer';
 import 'package:http/http.dart' as http;
 import '../api/api_config.dart';
 import '../../models/route_line.dart' as model_route_line;
@@ -9,19 +10,17 @@ import '../services/auth_service.dart';
 
 class RouteService {
   final String baseUrl = ApiConfig.baseUrl;
-  final AuthService _authService = AuthService();
+  final AuthService _authService;
   SharedPreferences? _prefs;
   String? _sessionId;
 
-  RouteService() {
-    _initializePrefs();
+  RouteService({AuthService? authService})
+    : _authService = authService ?? AuthService() {
+    _initializeAuthService();
   }
 
-  Future<void> _initializePrefs() async {
-    if (_prefs == null) {
-      _prefs = await SharedPreferences.getInstance();
-      _sessionId = _prefs?.getString('session_id');
-    }
+  Future<void> _initializeAuthService() async {
+    await _authService.initializeSession();
   }
 
   Future<String?> _getSessionId() async {
@@ -37,12 +36,18 @@ class RouteService {
     try {
       print('🔄 [RouteService] Attempting re-authentication...');
       final Uri authUri = Uri.parse('${ApiConfig.connectionEndpoint}');
+
+      print(
+        '🔑 [RouteService] Re-authentication request body: Username: ${_authService.username}, Password: ${_authService.password}',
+      );
+
       final response = await http.post(
         authUri,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
+
         body: jsonEncode({
           "jsonrpc": "2.0",
           "params": {
@@ -108,7 +113,6 @@ class RouteService {
           'message': 'Authentication failed. Please login again.',
         };
       }
-      String? sessionId = _sessionId;
 
       final Map<String, String> queryParams = {};
       if (driverId != null) {
@@ -139,7 +143,7 @@ class RouteService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Cookie': 'session_id=$sessionId',
+          'Cookie': 'session_id=$_sessionId',
         },
       );
 
@@ -201,6 +205,18 @@ class RouteService {
     required List<BusPoint> busPoints,
   }) async {
     try {
+      // Ensure session is valid before making API call
+      final reAuthSuccess = await _reAuthenticate();
+      if (!reAuthSuccess) {
+        print(
+          '❌ [RouteService] Re-authentication failed, cannot proceed with request',
+        );
+        return {
+          'status': false,
+          'message': 'Authentication failed. Please login again.',
+        };
+      }
+
       // Convert time strings to required format (e.g., "09:45" to "9.45")
       String convertTimeFormat(String time) {
         final parts = time.split(':');
@@ -284,11 +300,19 @@ class RouteService {
     }
 
     try {
-      await _initializePrefs(); // Ensure prefs is initialized
-      final sessionId = _sessionId ?? _prefs?.getString('session_id');
-      if (sessionId == null) {
-        return {'status': false, 'message': 'Session not found'};
+      // Ensure session is valid before making API call
+      final reAuthSuccess = await _reAuthenticate();
+      if (!reAuthSuccess) {
+        print(
+          '❌ [RouteService] Re-authentication failed, cannot proceed with request',
+        );
+        return {
+          'status': false,
+          'message': 'Authentication failed. Please login again.',
+        };
       }
+
+      String? sessionId = _sessionId;
 
       print('📤 [RouteService] Updating route with ID: $routeId');
       print('📝 [RouteService] Request payload:');

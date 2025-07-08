@@ -1,5 +1,5 @@
 import 'dart:ui';
-import 'package:amman_tms_mobile/add_bus_trip_screen.dart';
+import 'package:amman_tms_mobile/screens/bus_trip/add_bus_trip_screen.dart';
 import 'dart:async'; // Import for Timer
 import 'dart:convert';
 import 'dart:ui';
@@ -11,14 +11,14 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 
-import '../core/api/api_config.dart';
-import '../core/services/auth_service.dart';
-import '../core/services/traccar_service.dart'; // Import TraccarService
-import '../models/bus_info.dart';
-import '../models/bus_status.dart';
-import '../widgets/bus_list_item_widget.dart';
-import '../widgets/detail_item_widget.dart';
-import '../widgets/status_card_widget.dart';
+import 'package:amman_tms_mobile/core/api/api_config.dart';
+import 'package:amman_tms_mobile/core/services/auth_service.dart';
+import 'package:amman_tms_mobile/core/services/traccar_service.dart'; // Import TraccarService
+import 'package:amman_tms_mobile/models/bus_info.dart';
+import 'package:amman_tms_mobile/models/bus_status.dart';
+import 'package:amman_tms_mobile/widgets/bus_list_item_widget.dart';
+import 'package:amman_tms_mobile/widgets/detail_item_widget.dart';
+import 'package:amman_tms_mobile/widgets/status_card_widget.dart';
 
 enum MapType { dark, street }
 
@@ -64,7 +64,9 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
       duration: const Duration(seconds: 2),
     )..repeat();
     _scrollController = ScrollController()..addListener(_onScroll);
-    _loadData();
+    _authService.initializeSession().then((_) {
+      _loadData();
+    });
   }
 
   Future<void> _loadData() async {
@@ -73,15 +75,17 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
       _isLoading = true;
     });
 
+    await _authService.initializeSession();
     try {
       // Ensure session is valid before making API call
       final reAuthSuccess = await _reAuthenticate();
       if (!reAuthSuccess) {
-        print('❌ [MultiBusMapScreen] Re-authentication failed, cannot proceed with request');
+        print(
+          '❌ [MultiBusMapScreen] Re-authentication failed, cannot proceed with request',
+        );
         return;
       }
       // Session ID should now be available via _authService.sessionId if _reAuthenticate was successful
-      _sessionId = _authService.sessionId; // Update local _sessionId from AuthService
 
       final Uri uri = Uri.parse(
         '${ApiConfig.baseUrl}/traccar/device?page=$_currentPage&per_page=$_perPage&pagination=1',
@@ -214,7 +218,9 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
   }
 
   void _startLiveTracking(int deviceId) {
-    _liveTrackingTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+    _liveTrackingTimer = Timer.periodic(const Duration(seconds: 5), (
+      timer,
+    ) async {
       final positions = await TraccarService.fetchBusPositions(deviceId);
       if (positions.isNotEmpty) {
         final latestPosition = positions.first;
@@ -224,8 +230,12 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
             attributes: Attributes(
               ignition: latestPosition['attributes']['ignition'] ?? false,
               motion: latestPosition['attributes']['motion'] ?? false,
-              power: (latestPosition['attributes']['power'] as num?)?.toDouble() ?? 0.0,
-              odometer: (latestPosition['attributes']['odometer'] as num?)?.toInt() ?? 0,
+              power:
+                  (latestPosition['attributes']['power'] as num?)?.toDouble() ??
+                  0.0,
+              odometer:
+                  (latestPosition['attributes']['odometer'] as num?)?.toInt() ??
+                  0,
             ),
             latitude: (latestPosition['latitude'] as num).toDouble(),
             longitude: (latestPosition['longitude'] as num).toDouble(),
@@ -362,7 +372,7 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
               height: 80,
               child: GestureDetector(
                 onTap: () => _onBusSelected(bus),
-                 child: _buildBusMarker(
+                child: _buildBusMarker(
                   bus.deviceId == selectedBus?.deviceId && liveBusStatus != null
                       ? liveBusStatus!
                       : status,
@@ -519,7 +529,8 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
   }
 
   Widget _buildDetailView(ScrollController controller, BusInfo bus) {
-    final displayStatus = selectedBus?.deviceId == bus.deviceId && liveBusStatus != null
+    final displayStatus =
+        selectedBus?.deviceId == bus.deviceId && liveBusStatus != null
         ? liveBusStatus!
         : allBusStatus.firstWhere(
             (s) => s.deviceId.toString() == bus.deviceId,

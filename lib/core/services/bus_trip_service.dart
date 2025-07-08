@@ -8,7 +8,13 @@ class BusTripService {
   String? _sessionId;
 
   BusTripService({AuthService? authService})
-    : _authService = authService ?? AuthService();
+    : _authService = authService ?? AuthService() {
+    _initializeAuthService();
+  }
+
+  Future<void> _initializeAuthService() async {
+    await _authService.initializeSession();
+  }
 
   Future<String?> _getSessionId() async {
     await _authService.initializeSession();
@@ -132,7 +138,7 @@ class BusTripService {
       } else {
         uri = Uri.parse('${ApiConfig.baseUrl}/bus-trip/list');
       }
-
+  
       print(
         '🌐 [BusTripService] Making request to: [32m[1m[4m${uri.toString()}[0m',
       );

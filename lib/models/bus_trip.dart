@@ -24,6 +24,7 @@ class BusTrip {
   final int userId;
   final int? statusSeq;
   final List<RouteLine>? routeLineIds;
+  final int? punctualityStatus;
 
   BusTrip({
     required this.id,
@@ -48,6 +49,7 @@ class BusTrip {
     this.statusSeq,
     this.routeLineIds,
     this.busIdStatusName,
+    this.punctualityStatus,
   });
 
   factory BusTrip.fromJson(Map<String, dynamic> json) {
@@ -80,6 +82,9 @@ class BusTrip {
       routeLineIds: (json['route_line_ids'] as List<dynamic>?)
           ?.map((e) => RouteLine.fromJson(e as Map<String, dynamic>))
           .toList(),
+      punctualityStatus: json['punctuality_status'] != null
+          ? int.tryParse(json['punctuality_status'].toString())
+          : null,
     );
   }
 

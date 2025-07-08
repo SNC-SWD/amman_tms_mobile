@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:amman_tms_mobile/core/services/auth_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class LoginScreen extends StatefulWidget {
   final void Function(String userRole) onLoginSuccess;
@@ -38,6 +39,9 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (result['success'] == true) {
+        String? fcmToken = await FirebaseMessaging.instance.getToken();
+        print("FCM Token: $fcmToken");
+        // You might want to send this token to your backend along with login credentials
         widget.onLoginSuccess(result['userRole']);
       } else {
         setState(() {

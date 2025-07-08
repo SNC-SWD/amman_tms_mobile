@@ -1,21 +1,17 @@
+import 'package:amman_tms_mobile/screens/notification/notification_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'routes_screen.dart' as routes;
-import 'route_form_screen.dart';
-import 'notification_screen.dart';
-import 'core/services/bus_trip_service.dart';
-import 'core/services/route_service.dart';
-import 'core/services/auth_service.dart';
-import 'core/services/fleet_service.dart';
-import 'models/bus_trip.dart';
-import 'bus_trip_history_screen.dart';
-import 'bus_trip_detail_screen.dart';
-import 'models/route_line.dart' as model_route_line;
-import 'add_bus_trip_screen.dart';
+import 'package:amman_tms_mobile/screens/bus_trip/bus_trip_history_screen.dart';
+import 'package:amman_tms_mobile/screens/bus_trip/bus_trip_detail_screen.dart';
+import 'package:amman_tms_mobile/screens/bus_trip/add_bus_trip_screen.dart';
+import 'package:amman_tms_mobile/screens/bus_trip/plan_trip_screen.dart';
+import 'package:amman_tms_mobile/screens/bus_trip/trip_confirmation_screen.dart';
+import 'package:amman_tms_mobile/core/services/bus_trip_service.dart';
+import 'package:amman_tms_mobile/core/services/route_service.dart';
+import 'package:amman_tms_mobile/core/services/auth_service.dart';
+import 'package:amman_tms_mobile/core/services/fleet_service.dart';
+import 'package:amman_tms_mobile/models/bus_trip.dart';
 import 'package:intl/intl.dart';
-import 'screens/plan_trip_screen.dart';
-import 'screens/trip_confirmation_screen.dart';
-import 'models/plan_trip.dart';
 
 const kPrimaryBlue = Color(0xFF163458);
 const kAccentGold = Color(0xFFC88C2C);
@@ -58,12 +54,12 @@ class _HomeScreenState extends State<HomeScreen> {
   static List<BusTrip>? _cachedRoutes;
   static DateTime? _cachedRoutesTime;
   static const Duration _routesCacheDuration = Duration(minutes: 5);
-  
+
   // Cache variables for assigned bus
   static Map<String, dynamic>? _cachedAssignedBus;
   static DateTime? _cachedAssignedBusTime;
   static const Duration _assignedBusCacheDuration = Duration(minutes: 5);
-  
+
   // Cache variables for supervisor stats
   static Map<String, int>? _cachedStats;
   static DateTime? _cachedStatsTime;
@@ -174,13 +170,13 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
     }
-    
+
     setState(() {
       _isLoadingRoutes = true;
       _routeErrorMessage = null;
     });
     print('🔄 [HomeScreen] Start loading routes from API');
-    
+
     try {
       final userId = await _authService.getUserId();
       if (userId == null) {
@@ -207,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
           newRoutes = routesData
               .map<BusTrip>((route) => BusTrip.fromJson(route))
               .toList();
-              
+
           // Update cache
           _cachedRoutes = newRoutes;
           _cachedRoutesTime = DateTime.now();
@@ -329,7 +325,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
     }
-    
+
     setState(() {
       _isLoadingBus = true;
       _busErrorMessage = null;
@@ -353,7 +349,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Update cache
           _cachedAssignedBus = busData[0];
           _cachedAssignedBusTime = DateTime.now();
-          
+
           setState(() {
             _assignedBus = busData[0];
           });
@@ -451,10 +447,10 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
     }
-    
+
     setState(() => _isLoadingStats = true);
     print('🔄 [HomeScreen] Start loading supervisor stats from API');
-    
+
     try {
       // Total Routes
       final routeResult = await _routeService.getRoutes();
@@ -489,7 +485,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _todaysTrips = 0;
         _totalPassengers = 0;
       }
-      
+
       // Update cache
       _cachedStats = {
         'totalRoutes': _totalRoutes,
@@ -504,7 +500,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _activeBuses = 0;
       _todaysTrips = 0;
       _totalPassengers = 0;
-      
+
       // Clear cache on error
       _cachedStats = null;
       _cachedStatsTime = null;
@@ -586,9 +582,9 @@ class _HomeScreenState extends State<HomeScreen> {
             _cachedAssignedBusTime = null;
             _cachedStats = null;
             _cachedStatsTime = null;
-            
+
             print('🔄 [HomeScreen] Refresh: All caches cleared');
-            
+
             if (widget.userRole == 'supervisor') {
               print('🔄 [HomeScreen] Refresh: Loading supervisor data');
               await Future.wait([

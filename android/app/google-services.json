@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "814767397194",
+    "project_id": "etms-project-c75a4",
+    "storage_bucket": "etms-project-c75a4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:814767397194:android:ca7f6dd0edf4a99f5a89b3",
+        "android_client_info": {
+          "package_name": "com.example.ammantrans"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDRaqTDGD0dXvC0H9hASLo55R71xjUJJrg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

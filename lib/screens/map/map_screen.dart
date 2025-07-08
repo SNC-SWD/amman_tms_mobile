@@ -7,9 +7,9 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 
 // Import model dan widget kustom
-import '../models/bus_data.dart';
-import '../widgets/detail_item_widget.dart';
-import '../widgets/status_card_widget.dart';
+import 'package:amman_tms_mobile/models/bus_data.dart';
+import 'package:amman_tms_mobile/widgets/detail_item_widget.dart';
+import 'package:amman_tms_mobile/widgets/status_card_widget.dart';
 
 // Enum untuk tipe peta
 enum MapType { dark, street }

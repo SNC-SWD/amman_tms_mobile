@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'core/services/bus_point_service.dart';
-import 'core/services/fleet_service.dart';
-import 'core/services/auth_service.dart';
-import 'core/services/bus_trip_service.dart';
-import 'models/bus_point.dart';
-import 'models/fleet.dart';
-import 'route_form_screen.dart';
+import 'package:amman_tms_mobile/core/services/bus_point_service.dart';
+import 'package:amman_tms_mobile/core/services/fleet_service.dart';
+import 'package:amman_tms_mobile/core/services/auth_service.dart';
+import 'package:amman_tms_mobile/core/services/bus_trip_service.dart';
+import 'package:amman_tms_mobile/models/bus_point.dart';
+import 'package:amman_tms_mobile/models/fleet.dart';
+import 'package:amman_tms_mobile/screens/route/route_form_screen.dart';
 
 const kPrimaryBlue = Color(0xFF163458);
 const kAccentGold = Color(0xFFC88C2C);
@@ -25,7 +25,6 @@ class AddBusTripScreen extends StatefulWidget {
 class _AddBusTripScreenState extends State<AddBusTripScreen> {
   final BusPointService _busPointService = BusPointService();
   final FleetService _fleetService = FleetService();
-  final AuthService _authService = AuthService();
   final BusTripService _busTripService = BusTripService();
   final _formKey = GlobalKey<FormState>();
 
