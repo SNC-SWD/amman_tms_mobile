@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:amman_tms_mobile/core/services/bus_trip_service.dart';
 import 'package:amman_tms_mobile/models/bus_trip.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'trip_confirmation_screen.dart';
 
 const kPrimaryBlue = Color(0xFF163458);

@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:amman_tms_mobile/core/services/auth_service.dart';
 import 'package:amman_tms_mobile/core/services/bus_trip_service.dart';
 import 'package:amman_tms_mobile/models/bus_trip.dart';
-import 'package:amman_tms_mobile/core/services/auth_service.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 // TripConfirmationScreen
 // Halaman konfirmasi trip: menampilkan detail inquiry perjalanan, section jumlah penumpang (+, -, input manual), dan tombol submit untuk checkout trip.

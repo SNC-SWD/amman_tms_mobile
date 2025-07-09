@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:amman_tms_mobile/core/api/api_config.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
@@ -53,7 +54,6 @@ class AuthService {
     _username = prefs.getString(_usernameKey);
     _password = prefs.getString(_passwordKey);
   }
-
 
   // Save session to SharedPreferences
   Future<void> _saveSession(String sessionId) async {
@@ -151,6 +151,60 @@ class AuthService {
           await prefs.setString(_passwordKey, password);
           _username = username;
           _password = password;
+
+          // Re-authenticate to ensure session ID is fresh
+          final Uri authUri = Uri.parse('${ApiConfig.connectionEndpoint}');
+          final http.Response authResponse = await http.post(
+            authUri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({
+              "jsonrpc": "2.0",
+              "params": {
+                "db": "odoo17_copy_experiment",
+                "login": username,
+                "password": password,
+              },
+            }),
+          );
+
+          if (authResponse.statusCode == 200) {
+            final cookies = authResponse.headers['set-cookie'];
+            if (cookies != null) {
+              final extractedSessionId = RegExp(
+                r'session_id=([^;]+)',
+              ).firstMatch(cookies)?.group(1);
+
+              if (extractedSessionId != null) {
+                await _saveSession(extractedSessionId);
+                print('Session ID refreshed: $_sessionId');
+              }
+            }
+          }
+
+          // Send FCM token to server
+          try {
+            final fcmToken = await FirebaseMessaging.instance.getToken();
+            if (fcmToken != null) {
+              final fcmResponse = await http.put(
+                Uri.parse('${ApiConfig.baseUrl}/user/fcm_token'),
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                  'Cookie': 'session_id=$_sessionId',
+                },
+                body: jsonEncode({'fcm_token': fcmToken}),
+              );
+
+              if (fcmResponse.statusCode != 200) {
+                print('Failed to send FCM token: ${fcmResponse.statusCode}');
+              }
+            }
+          } catch (e) {
+            print('Error sending FCM token: $e');
+          }
 
           final String? jobTitle =
               responseData['data']['employee']?['job_title'];
