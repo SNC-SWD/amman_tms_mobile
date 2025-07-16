@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:amman_tms_mobile/core/services/auth_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'dart:ui'; // Diperlukan untuk ImageFilter
 
 class LoginScreen extends StatefulWidget {
   final void Function(String userRole) onLoginSuccess;
@@ -17,16 +18,19 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   final AuthService _authService = AuthService();
+  bool _isPasswordVisible = false;
 
-  // Palet warna global untuk login screen
-  static const kPrimaryBlue = Color(0xFF163458);
-  static const kAccentGold = Color(0xFFC88C2C);
-  static const kLightGray = Color(0xFFF4F6F9);
-  static const kSlateGray = Color(0xFF4C5C74);
-  static const kSoftGold = Color(0xFFE0B352);
-  static const kBlueTint = Color(0xFFE6EDF6);
+  // Palet warna yang disesuaikan untuk desain baru
+  static const kAccentGold = Color(0xFFE0B352); // Warna emas untuk tombol
+  static const kTextColor = Colors.white;
+  static const kHintTextColor = Color(0x99FFFFFF); // Putih dengan 70% opacity
 
   void _login() async {
+    // Sembunyikan keyboard saat login ditekan
+    FocusScope.of(context).unfocus();
+
+    if (!_formKey.currentState!.validate()) return;
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -41,7 +45,6 @@ class _LoginScreenState extends State<LoginScreen> {
       if (result['success'] == true) {
         String? fcmToken = await FirebaseMessaging.instance.getToken();
         print("FCM Token: $fcmToken");
-        // You might want to send this token to your backend along with login credentials
         widget.onLoginSuccess(result['userRole']);
       } else {
         setState(() {
@@ -52,7 +55,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       setState(() {
         _errorMessage =
-            'Unable to connect to the server. Please check your internet connection or try again later.';
+            'Unable to connect to the server. Please check your internet connection.';
         if (e is Exception) {
           print('Network error details: $e');
         }
@@ -64,179 +67,263 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kLightGray,
-      body: Center(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
-            child: Container(
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: kPrimaryBlue.withOpacity(0.08),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset(
-                    'assets/logo/logo.png',
-                    width: 250,
-                    height: 250,
-                    fit: BoxFit.fill,
-                  ),
-                  const SizedBox(height: 0),
-                  const Text(
-                    'Transport Management System',
-                    style: TextStyle(
-                      fontFamily: 'Montserrat',
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: kPrimaryBlue,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Please login to continue',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: kSlateGray,
-                      fontFamily: 'Montserrat',
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _usernameController,
-                          style: const TextStyle(fontSize: 12),
-                          decoration: InputDecoration(
-                            labelText: 'Username',
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            prefixIcon: const Icon(
-                              Icons.person_outline,
-                              color: kPrimaryBlue,
-                            ),
-                            labelStyle: const TextStyle(
-                              color: kSlateGray,
-                              fontSize: 12,
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: const BorderSide(
-                                color: kPrimaryBlue,
-                                width: 2,
-                              ),
+      // Menggunakan Stack untuk menumpuk background dan konten
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Layer 1: Background Image (Sama seperti Splash Screen)
+          Image.asset(
+            'assets/image/background.png', // <-- PASTIKAN PATH INI BENAR
+            fit: BoxFit.cover,
+            color: Colors.blueGrey.withOpacity(0.5),
+            colorBlendMode: BlendMode.darken,
+          ),
+
+          // Layer 2: Konten Login
+          SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Logo Aplikasi
+                          Image.asset(
+                            'assets/logo/new_logo_4.png', // <-- PASTIKAN PATH INI BENAR
+                            width: 250,
+                            height: 250,
+                          ),
+
+                          // Judul Halaman
+                          const Text(
+                            'Welcome Back',
+                            style: TextStyle(
+                              color: kTextColor,
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Poppins',
                             ),
                           ),
-                          validator: (value) => value == null || value.isEmpty
-                              ? 'Username wajib diisi'
-                              : null,
-                        ),
-                        const SizedBox(height: 18),
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: true,
-                          style: const TextStyle(fontSize: 12),
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            prefixIcon: const Icon(
-                              Icons.lock_outline,
-                              color: kPrimaryBlue,
-                            ),
-                            labelStyle: const TextStyle(
-                              color: kSlateGray,
-                              fontSize: 12,
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: const BorderSide(
-                                color: kPrimaryBlue,
-                                width: 2,
-                              ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Sign in to your account',
+                            style: TextStyle(
+                              color: kTextColor.withOpacity(0.8),
+                              fontSize: 16,
+                              fontFamily: 'Poppins',
                             ),
                           ),
-                          validator: (value) => value == null || value.isEmpty
-                              ? 'Password wajib diisi'
-                              : null,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_errorMessage != null) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      _errorMessage!,
-                      style: const TextStyle(color: Colors.red, fontSize: 10),
-                    ),
-                  ],
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 45,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: kAccentGold,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        elevation: 6,
-                        textStyle: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          fontFamily: 'Montserrat',
-                        ),
+                          const SizedBox(height: 30),
+
+                          // Container dengan efek Glassmorphism
+                          _buildGlassmorphicForm(),
+                        ],
                       ),
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-                              if (_formKey.currentState?.validate() ?? false) {
-                                _login();
-                              }
-                            },
-                      child: _isLoading
-                          ? const CircularProgressIndicator(color: kPrimaryBlue)
-                          : const Text(
-                              'Login',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontFamily: 'Montserrat',
-                              ),
-                            ),
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  // Removed hardcoded demo text as API is now integrated
-                  // const Text(
-                  //   'Demo: user demo, pass demo123',
-                  //   style: TextStyle(
-                  //     color: kSlateGray,
-                  //     fontSize: 14,
-                  //     fontFamily: 'Montserrat',
-                  //   ),
-                  // ),
-                ],
-              ),
+                ),
+                // Bagian "Powered By" di bagian bawah
+                _buildPoweredBy(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGlassmorphicForm() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(25.0),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+        child: Container(
+          padding: const EdgeInsets.all(24.0),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(25.0),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.2),
+              width: 1.5,
+            ),
+          ),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Input field untuk Username
+                TextFormField(
+                  controller: _usernameController,
+                  keyboardType: TextInputType.text,
+                  style: const TextStyle(
+                    color: kTextColor,
+                    fontSize: 14,
+                    fontFamily: 'Poppins',
+                  ),
+                  decoration: _buildInputDecoration(
+                    label: 'Username',
+                    icon: Icons.person_outline,
+                  ),
+                  validator: (value) => value == null || value.isEmpty
+                      ? 'Username is required'
+                      : null,
+                ),
+                const SizedBox(height: 20),
+
+                // Input field untuk Password
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: !_isPasswordVisible,
+                  style: const TextStyle(
+                    color: kTextColor,
+                    fontSize: 14,
+                    fontFamily: 'Poppins',
+                  ),
+                  decoration: _buildInputDecoration(
+                    label: 'Password',
+                    icon: Icons.lock_outline,
+                    isPassword: true,
+                  ),
+                  validator: (value) => value == null || value.isEmpty
+                      ? 'Password is required'
+                      : null,
+                ),
+                const SizedBox(height: 16),
+
+                // Menampilkan pesan error jika ada
+                if (_errorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: Text(
+                      _errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.red[300],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+
+                // Tombol Login
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kAccentGold,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      elevation: 8,
+                      shadowColor: Colors.black.withOpacity(0.4),
+                    ),
+                    onPressed: _isLoading ? null : _login,
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 3,
+                            ),
+                          )
+                        : const Text(
+                            'LOGIN',
+                            style: TextStyle(
+                              color: Color(
+                                0xFF163458,
+                              ), // Warna teks gelap agar kontras
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Poppins',
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // Helper method untuk membuat dekorasi input field
+  InputDecoration _buildInputDecoration({
+    required String label,
+    required IconData icon,
+    bool isPassword = false,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: kHintTextColor, fontSize: 14),
+      prefixIcon: Icon(icon, color: kHintTextColor, size: 20),
+      suffixIcon: isPassword
+          ? IconButton(
+              icon: Icon(
+                _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                color: kHintTextColor,
+                size: 20,
+              ),
+              onPressed: () {
+                setState(() {
+                  _isPasswordVisible = !_isPasswordVisible;
+                });
+              },
+            )
+          : null,
+      filled: true,
+      fillColor: Colors.black.withOpacity(0.2),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15.0),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15.0),
+        borderSide: BorderSide(color: kAccentGold.withOpacity(0.8), width: 2),
+      ),
+      errorStyle: TextStyle(
+        color: Colors.red[300],
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  // Widget baru untuk menampilkan "Powered By"
+  Widget _buildPoweredBy() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Powered By',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              color: Colors.white.withOpacity(0.6),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Image.asset(
+            'assets/logo/logo_snc.png', // <-- GANTI DENGAN PATH LOGO ANDA
+            height: 35,
+            // Tambahkan error builder untuk menangani jika logo tidak ditemukan
+            errorBuilder: (context, error, stackTrace) {
+              return const Icon(
+                Icons.business,
+                color: Colors.white54,
+                size: 35,
+              );
+            },
+          ),
+        ],
       ),
     );
   }

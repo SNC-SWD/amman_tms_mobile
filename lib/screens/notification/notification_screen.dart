@@ -27,7 +27,11 @@ class NotificationScreen extends StatelessWidget {
           elevation: 0,
           title: const Text(
             'Notifications',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              fontFamily: 'Poppins',
+            ),
           ),
           actions: [
             IconButton(

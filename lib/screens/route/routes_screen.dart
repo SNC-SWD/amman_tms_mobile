@@ -1,3 +1,6 @@
+import 'dart:ui';
+
+import 'package:amman_tms_mobile/screens/route/route_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'route_form_screen.dart'; // Asumsi file ini ada
@@ -292,28 +295,222 @@ class _RoutesScreenState extends State<RoutesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kLightGray,
-      body: SafeArea(
-        child: Column(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: kLightGray,
+        body: Stack(
           children: [
-            _buildTopBar(context),
-            _buildSearchAndFilter(),
-            Expanded(child: _buildBodyContent()),
+            // --- Layer 1: Latar Belakang Gradient Mesh Baru ---
+            _buildModernBackground(),
+
+            // --- Layer 2: Konten Utama ---
+            Column(
+              children: [
+                _buildHeader(),
+                _buildSearchAndFilter(),
+                Expanded(child: _buildBodyContent()),
+              ],
+            ),
           ],
         ),
+        floatingActionButton:
+            (widget.userRole == 'driver' || widget.userRole == 'passenger')
+            ? null
+            : FloatingActionButton(
+                onPressed: _addRoute,
+                backgroundColor: kAccentGold,
+                foregroundColor: Colors.white,
+                tooltip: 'Tambah Rute',
+                elevation: 4,
+                child: const Icon(Icons.add, size: 28),
+              ),
       ),
-      floatingActionButton:
-          (widget.userRole == 'driver' || widget.userRole == 'passenger')
-          ? null
-          : FloatingActionButton(
-              onPressed: _addRoute,
-              backgroundColor: kAccentGold,
-              foregroundColor: Colors.white,
-              tooltip: 'Tambah Rute',
-              elevation: 4,
-              child: const Icon(Icons.add, size: 28),
+    );
+  }
+
+  // --- WIDGET BARU UNTUK LATAR BELAKANG MODERN ---
+  Widget _buildModernBackground() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: kLightGray,
+      child: Stack(
+        children: [
+          // Lingkaran gradien yang di-blur
+          Positioned(
+            top: -150,
+            left: -150,
+            child: _buildGradientCircle(kPrimaryBlue.withOpacity(0.2), 400),
+          ),
+          Positioned(
+            bottom: -200,
+            right: -150,
+            child: _buildGradientCircle(kAccentGold.withOpacity(0.2), 450),
+          ),
+          Positioned(
+            bottom: 100,
+            left: -100,
+            child: _buildGradientCircle(kPrimaryBlue.withOpacity(0.1), 350),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGradientCircle(Color color, double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [color, Colors.transparent],
+          center: Alignment.center,
+          radius: 0.8,
+        ),
+      ),
+    );
+  }
+
+  // --- WIDGET BARU UNTUK HEADER MODERN ---
+  Widget _buildHeader() {
+    return Container(
+      color: Colors.transparent,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          ClipPath(
+            clipper: WaveClipper(),
+            child: Container(
+              height: 130, // Tinggi header disesuaikan untuk halaman ini
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [kPrimaryBlue, Color(0xFF2E4C6D)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
             ),
+          ),
+          // Konten di atas latar belakang melengkung
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 36),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  // Tombol kembali jika diperlukan (opsional)
+                  // IconButton(icon: Icon(Icons.arrow_back_ios_new, color: Colors.white), onPressed: () => Navigator.pop(context)),
+                  // Spacer(),
+                  const Text(
+                    'Routes',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 22,
+                      color: Colors.white,
+                    ),
+                  ),
+                  // Spacer(),
+                  // SizedBox(width: 48), // Spacer untuk menyeimbangkan tombol kembali
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- MODIFIKASI: _buildSearchAndFilter dibuat transparan ---
+  Widget _buildSearchAndFilter() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      color: Colors.transparent, // Dibuat transparan
+      child: Column(
+        children: [
+          TextField(
+            controller: _searchController,
+            onChanged: (value) => setState(() => _searchQuery = value),
+            decoration: InputDecoration(
+              hintText: 'Cari rute, bus, atau lokasi...',
+              hintStyle: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: kSlateGray,
+              ),
+              labelStyle: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: kSlateGray,
+              ),
+              prefixIcon: const Icon(Icons.search, color: kSlateGray, size: 20),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(
+                        Icons.clear,
+                        color: kSlateGray,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none, // Hapus border default
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: kAccentGold, width: 1.5),
+              ),
+            ),
+          ),
+          if (_availableFleets.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 36,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _availableFleets.length + 1,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return _buildFilterChip(
+                      'Semua',
+                      _selectedFleet == null,
+                      () {
+                        setState(() => _selectedFleet = null);
+                      },
+                    );
+                  }
+                  final fleet = _availableFleets[index - 1];
+                  final isSelected = _selectedFleet == fleet;
+                  return _buildFilterChip(fleet, isSelected, () {
+                    setState(() => _selectedFleet = isSelected ? null : fleet);
+                  });
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -413,107 +610,6 @@ class _RoutesScreenState extends State<RoutesScreen> {
     );
   }
 
-  Widget _buildTopBar(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Image.asset(
-            'assets/logo/logo.png',
-            height: 32,
-            errorBuilder: (_, __, ___) =>
-                const Icon(Icons.dashboard, color: kPrimaryBlue, size: 30),
-          ),
-          const SizedBox(width: 12),
-          const Text(
-            'Routes',
-            style: TextStyle(
-              fontFamily: 'Montserrat',
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: kPrimaryBlue,
-            ),
-          ),
-          const Spacer(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchAndFilter() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      color: kLightGray,
-      child: Column(
-        children: [
-          TextField(
-            controller: _searchController,
-            onChanged: (value) => setState(() => _searchQuery = value),
-            decoration: InputDecoration(
-              hintText: 'Cari rute, bus, atau lokasi...',
-              prefixIcon: const Icon(Icons.search, color: kSlateGray, size: 20),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(
-                        Icons.clear,
-                        color: kSlateGray,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                    )
-                  : null,
-              filled: true,
-              fillColor: Colors.white,
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade300, width: 1.0),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade300, width: 1.0),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: kAccentGold, width: 1.5),
-              ),
-            ),
-          ),
-          if (_availableFleets.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 36, // Tinggi tetap untuk chips
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _availableFleets.length + 1,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return _buildFilterChip(
-                      'Semua',
-                      _selectedFleet == null,
-                      () {
-                        setState(() => _selectedFleet = null);
-                      },
-                    );
-                  }
-                  final fleet = _availableFleets[index - 1];
-                  final isSelected = _selectedFleet == fleet;
-                  return _buildFilterChip(fleet, isSelected, () {
-                    setState(() => _selectedFleet = isSelected ? null : fleet);
-                  });
-                },
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _buildFilterChip(
     String label,
     bool isSelected,
@@ -553,7 +649,11 @@ class _RoutesScreenState extends State<RoutesScreen> {
           const SizedBox(height: 4),
           Text(
             'Coba ubah kata kunci atau filter Anda',
-            style: TextStyle(fontSize: 12, color: kSlateGray.withOpacity(0.7)),
+            style: TextStyle(
+              fontSize: 12,
+              color: kSlateGray.withOpacity(0.7),
+              fontFamily: 'Poppins',
+            ),
           ),
         ],
       ),
@@ -713,301 +813,36 @@ class _RoutesScreenState extends State<RoutesScreen> {
   }
 }
 
-// --- Best Practice: Pindahkan RouteDetailScreen ke file terpisah, misal: 'screens/route_detail_screen.dart' ---
-class RouteDetailScreen extends StatefulWidget {
-  final RouteData route;
-  final String userRole;
-  final Function(RouteData)? onRouteUpdated;
-  const RouteDetailScreen({
-    super.key,
-    required this.route,
-    required this.userRole,
-    this.onRouteUpdated,
-  });
-
+// --- CLASS BARU UNTUK MEMBUAT BENTUK MELENGKUNG (SAMA SEPERTI HOME) ---
+class WaveClipper extends CustomClipper<Path> {
   @override
-  State<RouteDetailScreen> createState() => _RouteDetailScreenState();
-}
-
-class _RouteDetailScreenState extends State<RouteDetailScreen> {
-  late RouteData _currentRoute;
-  bool _timelineMode = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentRoute = widget.route;
-  }
-
-  String _formatTime(String? time) {
-    if (time == null) return '-';
-    try {
-      final parts = time.split('.');
-      return '${parts[0].padLeft(2, '0')}:${parts.length > 1 ? parts[1].padLeft(2, '0') : '00'}';
-    } catch (e) {
-      return time;
-    }
-  }
-
-  String _calculateDuration(String? start, String? end) {
-    if (start == null || end == null) return '-';
-    try {
-      final startTotal =
-          int.parse(start.split('.')[0]) * 60 + int.parse(start.split('.')[1]);
-      final endTotal =
-          int.parse(end.split('.')[0]) * 60 + int.parse(end.split('.')[1]);
-      int diff = endTotal - startTotal;
-      if (diff < 0) diff += 24 * 60;
-      final hours = diff ~/ 60;
-      final minutes = diff % 60;
-      if (hours > 0) {
-        return minutes > 0 ? '$hours j $minutes m' : '$hours jam';
-      } else {
-        return '$minutes menit';
-      }
-    } catch (_) {
-      return '-';
-    }
-  }
-
-  void _editRoute() async {
-    final result = await pushWithTransition(
-      context,
-      RouteFormScreen(title: "Edit Rute", initialData: _currentRoute),
+  Path getClip(Size size) {
+    var path = Path();
+    path.lineTo(0, size.height - 40); // Mulai dari bawah
+    var firstControlPoint = Offset(size.width / 4, size.height);
+    var firstEndPoint = Offset(size.width / 2, size.height - 20);
+    path.quadraticBezierTo(
+      firstControlPoint.dx,
+      firstControlPoint.dy,
+      firstEndPoint.dx,
+      firstEndPoint.dy,
     );
-    if (result == true) {
-      // Refresh detail, ideally reload from API, for now just pop and reload parent
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Route berhasil diupdate'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.of(context).pop(true); // trigger parent refresh
-      }
-    }
+    var secondControlPoint = Offset(
+      size.width - (size.width / 4),
+      size.height - 40,
+    );
+    var secondEndPoint = Offset(size.width, size.height - 30);
+    path.quadraticBezierTo(
+      secondControlPoint.dx,
+      secondControlPoint.dy,
+      secondEndPoint.dx,
+      secondEndPoint.dy,
+    );
+    path.lineTo(size.width, 0);
+    path.close();
+    return path;
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kLightGray,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: kPrimaryBlue,
-        elevation: 0.5,
-        title: const Text(
-          'Detail Rute',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        actions: [
-          if (widget.userRole != 'driver')
-            IconButton(
-              icon: const Icon(Icons.edit_note_rounded, color: kAccentGold),
-              tooltip: 'Edit Rute',
-              onPressed: _editRoute,
-            ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDetailHeader(),
-            const SizedBox(height: 24),
-            _buildRouteLinesSection(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailHeader() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _currentRoute.name,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: kPrimaryBlue,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              const Icon(Icons.directions_bus, color: kSlateGray, size: 16),
-              const SizedBox(width: 8),
-              Text(
-                _currentRoute.bus,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: kSlateGray,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              const Icon(Icons.timer_outlined, color: kSlateGray, size: 16),
-              const SizedBox(width: 8),
-              Text(
-                '${_formatTime(_currentRoute.startTime)} - ${_formatTime(_currentRoute.endTime)}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: kSlateGray,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 24),
-          IntrinsicHeight(
-            child: Row(
-              children: [
-                _buildDetailInfo(
-                  Icons.my_location,
-                  "Boarding",
-                  _currentRoute.boardingPoint ?? '-',
-                ),
-                const VerticalDivider(width: 24, thickness: 1),
-                _buildDetailInfo(
-                  Icons.flag,
-                  "Dropping",
-                  _currentRoute.droppingPoint ?? '-',
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailInfo(IconData icon, String label, String value) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(color: kSlateGray.withOpacity(0.8), fontSize: 12),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              color: kPrimaryBlue,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRouteLinesSection() {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Route Lines',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                color: kPrimaryBlue,
-              ),
-            ),
-            Container(
-              decoration: BoxDecoration(
-                color: kBlueTint,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: ToggleButtons(
-                isSelected: [_timelineMode, !_timelineMode],
-                onPressed: (index) =>
-                    setState(() => _timelineMode = index == 0),
-                borderRadius: BorderRadius.circular(10),
-                selectedColor: Colors.white,
-                color: kPrimaryBlue,
-                fillColor: kPrimaryBlue,
-                splashColor: kPrimaryBlue.withOpacity(0.2),
-                borderWidth: 0,
-                selectedBorderColor: kPrimaryBlue,
-                constraints: const BoxConstraints(minHeight: 36, minWidth: 48),
-                children: const [
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12),
-                    child: Icon(Icons.timeline, size: 20),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12),
-                    child: Icon(Icons.view_agenda, size: 20),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        if (_currentRoute.lines == null || _currentRoute.lines!.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 48.0),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(Icons.alt_route, size: 40, color: kSlateGray),
-                  SizedBox(height: 8),
-                  Text(
-                    'Belum ada route line',
-                    style: TextStyle(color: kSlateGray, fontSize: 14),
-                  ),
-                ],
-              ),
-            ),
-          )
-        else
-          _timelineMode
-              ? TimelineRouteView(
-                  lines: _currentRoute.lines!,
-                  calculateDuration: _calculateDuration,
-                )
-              : SteppedRouteView(
-                  lines: _currentRoute.lines!,
-                  calculateDuration: _calculateDuration,
-                ),
-      ],
-    );
-  }
-}
-
-// --- Best Practice: Pindahkan ProfileScreen ke file terpisah ---
-// Definisi ProfileScreen dan widget-child-nya bisa dipindahkan.
-// Saya biarkan di sini agar kode tetap berjalan, tapi ini adalah saran perbaikan.
-class ProfileScreen extends StatelessWidget {
-  final VoidCallback onLogout;
-  const ProfileScreen({super.key, required this.onLogout});
-
-  @override
-  Widget build(BuildContext context) {
-    // Implementasi ProfileScreen tidak berubah...
-    return Scaffold(
-      appBar: AppBar(title: const Text("Profile")),
-      body: Center(
-        child: ElevatedButton(onPressed: onLogout, child: const Text("Logout")),
-      ),
-    );
-  }
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }

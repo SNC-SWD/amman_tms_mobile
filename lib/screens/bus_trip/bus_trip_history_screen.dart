@@ -137,149 +137,197 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
     final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white, // Eksplisit set background color
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
+        // State sementara untuk filter di dalam bottom sheet
         String? tempBus = _selectedBus;
         int? tempStatus = _selectedStatus;
         DateTime? tempStart = _startDate;
         DateTime? tempEnd = _endDate;
+
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 24,
-                right: 24,
-                top: 24,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Filter',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                  const SizedBox(height: 18),
-                  DropdownButtonFormField<String>(
-                    value: tempBus ?? '',
-                    items: [
-                      const DropdownMenuItem<String>(
-                        value: '',
-                        child: Text('All Bus'),
-                      ),
-                      ..._busList
-                          .map(
-                            (bus) => DropdownMenuItem<String>(
-                              value: bus,
-                              child: Text(bus),
-                            ),
-                          )
-                          .toList(),
-                    ],
-                    onChanged: (v) => setModalState(() => tempBus = v),
-                    decoration: const InputDecoration(
-                      labelText: 'Bus',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<int?>(
-                    value: tempStatus,
-                    items: const [
-                      DropdownMenuItem(
-                        value: null,
-                        child: Text('Semua Status'),
-                      ),
-                      DropdownMenuItem(value: 0, child: Text('Ready')),
-                      DropdownMenuItem(value: 1, child: Text('Trip Confirmed')),
-                      DropdownMenuItem(value: 2, child: Text('On Trip')),
-                      DropdownMenuItem(value: 3, child: Text('End Trip')),
-                    ],
-                    onChanged: (v) => setModalState(() => tempStatus = v),
-                    decoration: const InputDecoration(
-                      labelText: 'Status',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: tempStart ?? DateTime.now(),
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2100),
-                            );
-                            if (picked != null) {
-                              setModalState(() => tempStart = picked);
-                            }
-                          },
-                          child: AbsorbPointer(
-                            child: TextFormField(
-                              readOnly: true,
-                              decoration: InputDecoration(
-                                labelText: 'Start Date',
-                                border: const OutlineInputBorder(),
-                                suffixIcon: const Icon(Icons.date_range),
-                              ),
-                              controller: TextEditingController(
-                                text: tempStart != null
-                                    ? tempStart!.toIso8601String().substring(
-                                        0,
-                                        10,
-                                      )
-                                    : '',
-                              ),
-                            ),
-                          ),
+            // Fungsi untuk mereset filter ke nilai default
+            void resetFilters() {
+              setModalState(() {
+                tempBus = null;
+                tempStatus = null;
+                tempStart = null;
+                tempEnd = null;
+              });
+            }
+
+            return SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 24,
+                  right: 24,
+                  top: 16, // Padding atas dikurangi sedikit
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 1. Grip Handle (Indikator visual)
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: tempEnd ?? DateTime.now(),
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2100),
-                            );
-                            if (picked != null) {
-                              setModalState(() => tempEnd = picked);
-                            }
-                          },
-                          child: AbsorbPointer(
-                            child: TextFormField(
-                              readOnly: true,
-                              decoration: InputDecoration(
-                                labelText: 'End Date',
-                                border: const OutlineInputBorder(),
-                                suffixIcon: const Icon(Icons.date_range),
-                              ),
-                              controller: TextEditingController(
-                                text: tempEnd != null
-                                    ? tempEnd!.toIso8601String().substring(
-                                        0,
-                                        10,
-                                      )
-                                    : '',
-                              ),
-                            ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 2. Header yang Konsisten
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.filter_list_rounded,
+                          color: Colors.blueAccent,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Filter Data',
+                          style: TextStyle(
+                            fontSize: 20.0,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
                           ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 3. Form Fields yang Modern
+                    // Dropdown untuk Bus
+                    DropdownButtonFormField<String>(
+                      value: tempBus,
+                      decoration: _modernInputDecoration(
+                        label: 'Armada Bus',
+                        icon: Icons.directions_bus,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('Semua Bus'),
+                        ),
+                        ..._busList
+                            .map(
+                              (bus) => DropdownMenuItem<String>(
+                                value: bus,
+                                child: SizedBox(
+                                  width:
+                                      180, // Atur lebar maksimum sesuai kebutuhan UI
+                                  child: Text(
+                                    bus,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ],
+                      onChanged: (v) => setModalState(() => tempBus = v),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Dropdown untuk Status
+                    DropdownButtonFormField<int?>(
+                      value: tempStatus,
+                      decoration: _modernInputDecoration(
+                        label: 'Status Perjalanan',
+                        icon: Icons.flag_outlined,
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: null,
+                          child: Text('Semua Status'),
+                        ),
+                        DropdownMenuItem(value: 0, child: Text('Ready')),
+                        DropdownMenuItem(
+                          value: 1,
+                          child: Text('Trip Confirmed'),
+                        ),
+                        DropdownMenuItem(value: 2, child: Text('On Trip')),
+                        DropdownMenuItem(value: 3, child: Text('End Trip')),
+                      ],
+                      onChanged: (v) => setModalState(() => tempStatus = v),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 4. Date Picker yang Lebih Bersih
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildDatePickerField(
+                            context: context,
+                            labelText: 'Tanggal Mulai',
+                            selectedDate:
+                                tempStart ??
+                                DateTime.now(), // Sediakan nilai default
+                            onDatePicked: (pickedDate) {
+                              setModalState(() => tempStart = pickedDate);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildDatePickerField(
+                            context: context,
+                            labelText: 'Tanggal Selesai',
+                            selectedDate:
+                                tempEnd ??
+                                DateTime.now(), // Sediakan nilai default
+                            onDatePicked: (pickedDate) {
+                              setModalState(() => tempEnd = pickedDate);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+
+                    // 5. Tombol Aksi yang Ditingkatkan
+                    Row(
+                      children: [
+                        // Tombol Reset
+                        TextButton(
+                          onPressed: resetFilters,
+                          child: const Text(
+                            'Reset',
+                            style: TextStyle(fontSize: 14),
+                          ),
+                        ),
+                        const Spacer(),
+                        // Tombol Batal
+                        OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                          ),
+                          child: const Text(
+                            'Batal',
+                            style: TextStyle(fontSize: 14),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Tombol Terapkan
+                        ElevatedButton.icon(
                           onPressed: () {
                             Navigator.pop(context, {
                               'bus': tempBus,
@@ -289,25 +337,37 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
                             });
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: kPrimaryBlue,
+                            backgroundColor: Colors.blueAccent,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            textStyle: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          child: const Text('Apply'),
+                          icon: const Icon(
+                            Icons.check_circle_outline,
+                            size: 18,
+                          ),
+                          label: const Text('Terapkan'),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             );
           },
         );
       },
     );
+
     if (result != null) {
       setState(() {
         _selectedBus = result['bus'];
@@ -331,6 +391,56 @@ class _BusTripHistoryScreenState extends State<BusTripHistoryScreen> {
         statusSeq: _selectedStatus,
       );
     }
+  }
+
+  // Helper untuk dekorasi input agar konsisten
+  InputDecoration _modernInputDecoration({
+    required String label,
+    required IconData icon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, size: 20),
+      filled: true,
+      fillColor: Colors.grey[50],
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12.0),
+        borderSide: BorderSide.none,
+      ),
+      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+    );
+  }
+
+  // PASTIKAN WIDGET HELPER INI TERSEDIA DI DALAM FILE ANDA
+  Widget _buildDatePickerField({
+    required BuildContext context,
+    required String labelText,
+    required DateTime selectedDate,
+    required ValueChanged<DateTime> onDatePicked,
+  }) {
+    return InkWell(
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: selectedDate,
+          firstDate: DateTime(2020),
+          lastDate: DateTime(2100),
+        );
+        if (picked != null && picked != selectedDate) {
+          onDatePicked(picked);
+        }
+      },
+      child: InputDecorator(
+        decoration: _modernInputDecoration(
+          label: labelText,
+          icon: Icons.calendar_today_outlined,
+        ),
+        child: Text(
+          DateFormat('dd MMM yyyy').format(selectedDate),
+          style: const TextStyle(fontSize: 14.0, color: Colors.black87),
+        ),
+      ),
+    );
   }
 
   @override

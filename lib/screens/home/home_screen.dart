@@ -1,3 +1,4 @@
+import 'package:amman_tms_mobile/screens/bus/bus_search_screen.dart';
 import 'package:amman_tms_mobile/screens/notification/notification_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +13,9 @@ import 'package:amman_tms_mobile/core/services/auth_service.dart';
 import 'package:amman_tms_mobile/core/services/fleet_service.dart';
 import 'package:amman_tms_mobile/models/bus_trip.dart';
 import 'package:intl/intl.dart';
+import 'package:amman_tms_mobile/screens/bus/bus_list_page.dart';
+import 'dart:ui';
+import 'dart:async';
 
 const kPrimaryBlue = Color(0xFF163458);
 const kAccentGold = Color(0xFFC88C2C);
@@ -86,6 +90,23 @@ class _HomeScreenState extends State<HomeScreen> {
   int _todaysTrips = 0;
   bool _isLoadingStats = true;
 
+  // Tambahkan helper untuk mapping status_seq ke label dan warna
+  Map<int, Map<String, dynamic>> busStatusMap = {
+    0: {'label': 'Ready', 'color': Colors.grey},
+    1: {'label': 'Trip Confirmed', 'color': Colors.blue},
+    2: {'label': 'On Trip', 'color': Colors.green},
+    3: {'label': 'End Trip', 'color': Colors.red},
+    4: {'label': 'Standby', 'color': Colors.orange},
+    5: {'label': 'Maintenance', 'color': Colors.purple},
+    6: {'label': 'Change Shift', 'color': Colors.teal},
+    7: {'label': 'Rest', 'color': Colors.brown},
+  };
+
+  // Tambahkan di bagian atas class State (misal _HomeScreenState):
+  PageController? _statCardController;
+  int _currentStatCardPage = 0;
+  Timer? _statCardAutoScrollTimer;
+
   @override
   void initState() {
     super.initState();
@@ -130,6 +151,31 @@ class _HomeScreenState extends State<HomeScreen> {
     if (widget.userRole == 'passenger') {
       _loadRecentBusTrips();
     }
+    _statCardController = PageController(viewportFraction: 0.88);
+    _startStatCardAutoScroll();
+  }
+
+  void _startStatCardAutoScroll() {
+    _statCardAutoScrollTimer?.cancel();
+    _statCardAutoScrollTimer = Timer.periodic(const Duration(seconds: 4), (
+      timer,
+    ) {
+      if (_statCardController!.hasClients) {
+        int nextPage = (_currentStatCardPage + 1) % 4; // 4 = jumlah card
+        _statCardController!.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _statCardController?.dispose();
+    _statCardAutoScrollTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -157,20 +203,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadRoutesToConfirm() async {
-    // Check cache first
-    if (_cachedRoutes != null && _cachedRoutesTime != null) {
-      final now = DateTime.now();
-      if (now.difference(_cachedRoutesTime!) < _routesCacheDuration) {
-        print('🔄 [HomeScreen] Using cached routes to confirm');
-        setState(() {
-          _routesToConfirm = _cachedRoutes!;
-          _isLoadingRoutes = false;
-        });
-        print('✅ [HomeScreen] Routes cache used, loading false');
-        return;
-      }
-    }
-
     setState(() {
       _isLoadingRoutes = true;
       _routeErrorMessage = null;
@@ -353,6 +385,13 @@ class _HomeScreenState extends State<HomeScreen> {
           setState(() {
             _assignedBus = busData[0];
           });
+        } else {
+          // Tidak ada bus yang diassign
+          _cachedAssignedBus = null;
+          _cachedAssignedBusTime = null;
+          setState(() {
+            _assignedBus = null;
+          });
         }
       } else {
         setState(() {
@@ -360,6 +399,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Clear cache on error to prevent showing stale data
           _cachedAssignedBus = null;
           _cachedAssignedBusTime = null;
+          _assignedBus = null;
         });
       }
       print('✅ [HomeScreen] Assigned bus API success, loading false');
@@ -563,119 +603,311 @@ class _HomeScreenState extends State<HomeScreen> {
     final horizontalPadding = responsivePadding(context);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: kPrimaryBlue,
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent, // Buat status bar transparan
         statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
       ),
-      child: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async {
-            // Clear cache for all roles so refresh always fetches new data
-            _cachedTrips = null;
-            _cachedTime = null;
-            _cachedRoutes = null;
-            _cachedRoutesTime = null;
-            _cachedPlanTrips = null;
-            _cachedPlanTripsTime = null;
-            _cachedAssignedBus = null;
-            _cachedAssignedBusTime = null;
-            _cachedStats = null;
-            _cachedStatsTime = null;
+      child: Scaffold(
+        backgroundColor: kLightGray,
+        body: Stack(
+          children: [
+            // --- Layer 1: Latar Belakang Gradient Mesh Baru ---
+            _buildModernBackground(),
 
-            print('🔄 [HomeScreen] Refresh: All caches cleared');
+            // --- Layer 2: Konten Utama dengan Refresh Indicator ---
+            SafeArea(
+              top: false, // SafeArea untuk konten, tapi tidak untuk header
+              bottom: true,
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  // Clear cache for all roles so refresh always fetches new data
+                  _cachedTrips = null;
+                  _cachedTime = null;
+                  _cachedRoutes = null;
+                  _cachedRoutesTime = null;
+                  _cachedPlanTrips = null;
+                  _cachedPlanTripsTime = null;
+                  _cachedAssignedBus = null;
+                  _cachedAssignedBusTime = null;
+                  _cachedStats = null;
+                  _cachedStatsTime = null;
 
-            if (widget.userRole == 'supervisor') {
-              print('🔄 [HomeScreen] Refresh: Loading supervisor data');
-              await Future.wait([
-                _loadSupervisorStats(),
-                _loadRecentBusTrips(),
-                _loadRecentPlanTrips(),
-              ]);
-            } else if (widget.userRole == 'driver') {
-              print('🔄 [HomeScreen] Refresh: Loading driver data');
-              await Future.wait([_loadRoutesToConfirm(), _loadAssignedBus()]);
-            } else if (widget.userRole == 'passenger') {
-              print('🔄 [HomeScreen] Refresh: Loading passenger data');
-              await _loadRecentBusTrips();
-            }
-            print('✅ [HomeScreen] Refresh completed');
-          },
-          color: kAccentGold,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.symmetric(
-              horizontal: horizontalPadding,
-              vertical: 18,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        widget.userRole == 'supervisor'
-                            ? 'Welcome, ${_userName.isNotEmpty ? _userName : 'Supervisor'}'
-                            : widget.userRole == 'passenger'
-                            ? 'Welcome, ${_userName.isNotEmpty ? _userName : 'Passenger'}'
-                            : 'Hello, ${_userName.isNotEmpty ? _userName : 'Driver'}',
-                        style: TextStyle(
-                          fontFamily: 'Montserrat',
-                          fontWeight: FontWeight.bold,
-                          fontSize: responsiveFont(20, context), // MODIFIED
-                          color: kPrimaryBlue,
-                          letterSpacing: 1.1,
+                  print('🔄 [HomeScreen] Refresh: All caches cleared');
+
+                  if (widget.userRole == 'supervisor') {
+                    print('🔄 [HomeScreen] Refresh: Loading supervisor data');
+                    await Future.wait([
+                      _loadSupervisorStats(),
+                      _loadRecentBusTrips(),
+                      _loadRecentPlanTrips(),
+                    ]);
+                  } else if (widget.userRole == 'driver') {
+                    print('🔄 [HomeScreen] Refresh: Loading driver data');
+                    await Future.wait([
+                      _loadRoutesToConfirm(),
+                      _loadAssignedBus(),
+                    ]);
+                  } else if (widget.userRole == 'passenger') {
+                    print('🔄 [HomeScreen] Refresh: Loading passenger data');
+                    await _loadRecentBusTrips();
+                  }
+                  print('✅ [HomeScreen] Refresh completed');
+                },
+                color: kAccentGold,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // --- Header Baru yang Modern ---
+                      _buildHeader(),
+
+                      // --- SECTION: Assigned Bus Status (khusus driver) ---
+                      if (widget.userRole == 'driver')
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 10.0,
+                          ),
+                          child: _buildDriverAssignedBusSection(),
+                        ),
+
+                      // --- Konten Berdasarkan Role ---
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 8.0, // was 18.0
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (widget.userRole == 'supervisor') ...[
+                              _buildSupervisorStats(),
+                            ] else if (widget.userRole == 'driver') ...[
+                              _buildDriverStats(),
+                            ] else if (widget.userRole == 'passenger') ...[
+                              _PassengerStatCarouselWrapper(
+                                child: _buildPassengerStatsSection(),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.notifications_rounded,
-                        color: kPrimaryBlue,
-                        size: responsiveFont(22, context), // MODIFIED
+
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8.0, // was 18.0
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (widget.userRole == 'supervisor') ...[
+                              _buildRecentBusTrips(context),
+                              const SizedBox(height: 12), // was 24
+                              _buildSupervisorActions(context),
+                            ] else if (widget.userRole == 'driver') ...[
+                              _buildRoutesToConfirm(),
+                              const SizedBox(height: 12), // was 24
+                              _buildDriverActions(context),
+                            ] else if (widget.userRole == 'passenger') ...[
+                              _buildRecentBusTrips(context),
+                              const SizedBox(height: 12), // was 24
+                              _buildPassengerActions(context),
+                            ],
+                          ],
+                        ),
                       ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const NotificationScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 24),
-                // Section for each role
-                if (widget.userRole == 'supervisor') ...[
-                  _buildSupervisorStats(),
-                  const SizedBox(height: 24),
-                  _buildRecentBusTrips(context),
-                  // if (_recentPlanTrips.isNotEmpty) ...[
-                  //   const SizedBox(height: 24),
-                  //   _buildRecentPlanTrips(context),
-                  // ],
-                  const SizedBox(height: 24),
-                  _buildSupervisorActions(context),
-                ] else if (widget.userRole == 'driver') ...[
-                  _buildDriverStats(),
-                  const SizedBox(height: 24),
-                  _buildRoutesToConfirm(),
-                  const SizedBox(height: 24),
-                  _buildDriverActions(context),
-                ] else if (widget.userRole == 'passenger') ...[
-                  _buildPassengerStatsSection(),
-                  const SizedBox(height: 24),
-                  _buildRecentBusTrips(context),
-                  const SizedBox(height: 24),
-                  _buildPassengerActions(context),
-                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- WIDGET BARU UNTUK LATAR BELAKANG MODERN ---
+  Widget _buildModernBackground() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: kLightGray, // Warna dasar
+      child: Stack(
+        children: [
+          // Lingkaran gradien yang di-blur
+          Positioned(
+            top: -150,
+            left: -150,
+            child: _buildGradientCircle(kPrimaryBlue.withOpacity(0.2), 400),
+          ),
+          Positioned(
+            bottom: -200,
+            right: -150,
+            child: _buildGradientCircle(kAccentGold.withOpacity(0.2), 450),
+          ),
+          Positioned(
+            bottom: 100,
+            left: -100,
+            child: _buildGradientCircle(kPrimaryBlue.withOpacity(0.1), 350),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGradientCircle(Color color, double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [color, Colors.transparent],
+          center: Alignment.center,
+          radius: 0.8,
+        ),
+      ),
+    );
+  }
+
+  // --- WIDGET BARU UNTUK HEADER MODERN ---
+  Widget _buildHeader() {
+    // Helper untuk mengubah role menjadi teks yang lebih rapi
+    String getRoleTitle(String role) {
+      switch (role) {
+        case 'supervisor':
+          return 'Supervisor';
+        case 'driver':
+          return 'Driver';
+        case 'passenger':
+          return 'Passenger';
+        default:
+          return '';
+      }
+    }
+
+    return Container(
+      color: Colors.transparent, // Latar belakang header diatur oleh ClipPath
+      child: Stack(
+        children: [
+          // Latar belakang melengkung dengan gradient
+          ClipPath(
+            clipper: WaveClipper(),
+            child: Container(
+              height: 180, // Tinggi area header
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [kPrimaryBlue, Color(0xFF2E4C6D)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+            ),
+          ),
+          // Konten di atas latar belakang melengkung
+          Padding(
+            padding: const EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 50,
+              bottom: 20,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Hello, ${_userName.isNotEmpty ? _userName.split(' ')[0] : ''}',
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 22,
+                          color: Colors.white,
+                          letterSpacing: 1.1,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        getRoleTitle(widget.userRole),
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                          color: Colors.white.withOpacity(0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Tombol Notifikasi
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.notifications_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // --- WIDGET BARU UNTUK BLOB BACKGROUND ---
+  Widget _buildBackgroundBlobs() {
+    return Stack(
+      children: [
+        Positioned(
+          top: -100,
+          left: -100,
+          child: _buildBackgroundBlob(kPrimaryBlue.withOpacity(0.1), 300),
         ),
+        Positioned(
+          bottom: -150,
+          right: -150,
+          child: _buildBackgroundBlob(kAccentGold.withOpacity(0.1), 400),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBackgroundBlob(Color color, double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 100, sigmaY: 100),
+        child: Container(color: Colors.transparent),
       ),
     );
   }
@@ -684,211 +916,313 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_isLoadingStats) {
       return const Center(child: CircularProgressIndicator());
     }
+    const double kSpacing = 12.0;
+    final List<Widget> statCards = [
+      _buildStatCardV2(
+        icon: Icons.route_rounded,
+        title: 'Total Routes',
+        value: '$_totalRoutes Routes',
+        gradientColors: [Colors.blue.shade300, Colors.blue.shade500],
+        height: 120,
+      ),
+      _buildStatCardV2(
+        icon: Icons.directions_bus_rounded,
+        title: 'Active Buses',
+        value: '$_activeBuses Buses Running',
+        gradientColors: [Colors.orange.shade300, Colors.orange.shade500],
+        height: 120,
+      ),
+      _buildStatCardV2(
+        icon: Icons.groups_rounded,
+        title: 'Total Passengers',
+        value: '$_totalPassengers',
+        gradientColors: [Colors.green.shade300, Colors.green.shade500],
+        height: 120,
+      ),
+      _buildStatCardV2(
+        icon: Icons.schedule_rounded,
+        title: "Today's Trips",
+        value: '$_todaysTrips',
+        gradientColors: [Colors.grey.shade500, Colors.grey.shade700],
+        height: 120,
+      ),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Quick Stats',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: responsiveFont(14, context),
-            color: kPrimaryBlue,
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: kSpacing),
+          child: Text(
+            'Quick Stats',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.bold,
+              fontSize: responsiveFont(18, context),
+              color: kPrimaryBlue,
+            ),
           ),
         ),
-        SizedBox(height: responsiveFont(16, context)),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.route_rounded,
-                title: 'Total Routes',
-                value: '$_totalRoutes Routes',
-                color: kPrimaryBlue,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.directions_bus_rounded,
-                title: 'Active Buses',
-                value: '$_activeBuses Buses Running',
-                color: kAccentGold,
-              ),
-            ),
-          ],
+        const SizedBox(height: kSpacing),
+        SizedBox(
+          height: 140,
+          child: PageView.builder(
+            controller: _statCardController,
+            itemCount: statCards.length,
+            onPageChanged: (index) {
+              setState(() {
+                _currentStatCardPage = index;
+              });
+            },
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: statCards[index],
+              );
+            },
+          ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.groups_rounded,
-                title: 'Total Passengers',
-                value: '$_totalPassengers',
-                color: kSoftGold,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(statCards.length, (index) {
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              width: _currentStatCardPage == index ? 18 : 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: _currentStatCardPage == index
+                    ? kPrimaryBlue
+                    : Colors.grey[400],
+                borderRadius: BorderRadius.circular(4),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.schedule_rounded,
-                title: 'Today\'s Trips',
-                value: '$_todaysTrips',
-                color: kSlateGray,
-              ),
-            ),
-          ],
+            );
+          }),
         ),
       ],
     );
   }
 
   Widget _buildDriverStats() {
-    // Calculate today's date
+    // --- Data Logic (No Changes) ---
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-    // Filter trips for today
     final todayTrips = _routesToConfirm
         .where((trip) => trip.tripDate == today)
         .toList();
 
-    // 1. Today's Route - Find the nearest active trip today
-    // Shows boarding point → drop point with departure time
-    // If no active trips (statusSeq = 1 or 2), shows "No route today"
+    // 1. Today's Route
     String todayRouteValue = 'No route today';
-    BusTrip? nearestTrip;
-
-    if (todayTrips.isNotEmpty) {
-      // Find trips with active status (statusSeq = 1 or 2) and sort by start time
-      final activeTrips = todayTrips
-          .where((trip) => trip.statusSeq == 1 || trip.statusSeq == 2)
-          .toList();
-
-      if (activeTrips.isNotEmpty) {
-        // Sort by start time to find the earliest
-        activeTrips.sort((a, b) => a.startTime.compareTo(b.startTime));
-        nearestTrip = activeTrips.first;
-
-        // Format time
-        final startHour = nearestTrip.startTime.floor();
-        final startMinute = ((nearestTrip.startTime - startHour) * 60).round();
-        final timeStr =
-            '${startHour.toString().padLeft(2, '0')}:${startMinute.toString().padLeft(2, '0')}';
-
-        todayRouteValue =
-            '${nearestTrip.boardingPointName} → ${nearestTrip.dropPointName}, $timeStr';
-      }
+    final activeTrips = todayTrips
+        .where((trip) => trip.statusSeq == 1 || trip.statusSeq == 2)
+        .toList();
+    if (activeTrips.isNotEmpty) {
+      activeTrips.sort((a, b) => a.startTime.compareTo(b.startTime));
+      final nearestTrip = activeTrips.first;
+      final startHour = nearestTrip.startTime.floor();
+      final startMinute = ((nearestTrip.startTime - startHour) * 60).round();
+      final timeStr =
+          '${startHour.toString().padLeft(2, '0')}:${startMinute.toString().padLeft(2, '0')}';
+      todayRouteValue =
+          '${nearestTrip.boardingPointName} → ${nearestTrip.dropPointName}, $timeStr';
     }
 
-    // 2. Total Passengers - Sum of seatBooked from all today's trips
-    // Shows total number of passengers booked for all trips today
+    // 2. Total Passengers
     int totalPassengers = todayTrips.fold(
       0,
       (sum, trip) => sum + trip.seatBooked,
     );
     String totalPassengersValue = '$totalPassengers Today';
-    if (totalPassengers == 0) {
-      totalPassengersValue = '0 Today';
-    }
 
-    // 3. Last Confirmation - Find the most recent confirmed trip
-    // Shows the time of the most recent trip confirmation (statusSeq = 1 or 2)
-    // If no confirmed trips, shows "No confirmation yet"
+    // 3. Last Confirmation
     String lastConfirmationValue = 'No confirmation yet';
-
-    if (todayTrips.isNotEmpty) {
-      // Find trips with confirmed status (statusSeq = 1 or 2)
-      final confirmedTrips = todayTrips
-          .where((trip) => trip.statusSeq == 1 || trip.statusSeq == 2)
-          .toList();
-
-      if (confirmedTrips.isNotEmpty) {
-        // Sort by statusSeq (higher = more recent) and then by startTime
-        confirmedTrips.sort((a, b) {
-          if (a.statusSeq != b.statusSeq) {
-            return (b.statusSeq ?? 0).compareTo(a.statusSeq ?? 0);
-          }
-          return b.startTime.compareTo(a.startTime);
-        });
-
-        final lastConfirmedTrip = confirmedTrips.first;
-        final startHour = lastConfirmedTrip.startTime.floor();
-        final startMinute = ((lastConfirmedTrip.startTime - startHour) * 60)
-            .round();
-        final timeStr =
-            '${startHour.toString().padLeft(2, '0')}:${startMinute.toString().padLeft(2, '0')}';
-
-        lastConfirmationValue = 'Confirmed at $timeStr';
-      }
+    final confirmedTrips = todayTrips
+        .where((trip) => trip.statusSeq == 1 || trip.statusSeq == 2)
+        .toList();
+    if (confirmedTrips.isNotEmpty) {
+      confirmedTrips.sort((a, b) {
+        if (a.statusSeq != b.statusSeq) {
+          return (b.statusSeq ?? 0).compareTo(a.statusSeq ?? 0);
+        }
+        return b.startTime.compareTo(a.startTime);
+      });
+      final lastConfirmedTrip = confirmedTrips.first;
+      final startHour = lastConfirmedTrip.startTime.floor();
+      final startMinute = ((lastConfirmedTrip.startTime - startHour) * 60)
+          .round();
+      final timeStr =
+          '${startHour.toString().padLeft(2, '0')}:${startMinute.toString().padLeft(2, '0')}';
+      lastConfirmationValue = 'Confirmed at $timeStr';
     }
+
+    // 4. Assigned Bus Logic (diintegrasikan dari _buildAssignedBusCard)
+    String assignedBusTitle = 'Assigned Bus';
+    String assignedBusValue;
+    if (_isLoadingBus) {
+      assignedBusValue = 'Loading...';
+    } else if (_busErrorMessage != null) {
+      assignedBusValue = 'Error loading bus';
+    } else if (_assignedBus == null) {
+      assignedBusValue = 'No bus assigned';
+    } else {
+      assignedBusValue =
+          '${_assignedBus!['model_name']} - ${_assignedBus!['license_plate']}';
+    }
+
+    // --- Logika untuk membuat Badge dan Tombol Edit ---
+    Widget? assignedBusBadge;
+    Widget? editButton;
+
+    if (!_isLoadingBus && _assignedBus != null) {
+      int statusSeq = _assignedBus!['status_seq'] ?? 0;
+      String statusLabel = busStatusMap[statusSeq]?['label'] ?? 'Unknown';
+
+      // Membuat widget untuk badge status
+      assignedBusBadge = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.25),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: SizedBox(
+          width: 70,
+          child: Text(
+            statusLabel,
+            style: const TextStyle(
+              fontFamily: 'Poppins',
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              overflow: TextOverflow.ellipsis,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            softWrap: false,
+          ),
+        ),
+      );
+
+      // Membuat widget untuk tombol edit
+      editButton = InkWell(
+        onTap: () => _showEditBusStatusDialog(),
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.all(4.0),
+          child: Icon(
+            Icons.edit,
+            color: Colors.white.withOpacity(0.7),
+            size: 16,
+          ),
+        ),
+      );
+
+      // Update value untuk bus yang sudah ada
+      assignedBusValue =
+          '${_assignedBus!['model_name']} - ${_assignedBus!['license_plate']}';
+    } else if (_isLoadingBus) {
+      assignedBusValue = 'Loading...';
+    } else if (_busErrorMessage != null) {
+      assignedBusValue = 'Error loading bus';
+    } else {
+      assignedBusValue = 'No bus assigned';
+    }
+
+    // --- UI Constants ---
+    const double kTitleFontSize = 14.0;
+    const double kSpacing = 12.0;
+
+    // List stat card
+    final List<Widget> statCards = [
+      _buildStatCardV2(
+        icon: Icons.route_rounded,
+        title: 'Today\'s Route',
+        value: todayRouteValue,
+        gradientColors: [Colors.blue.shade300, Colors.blue.shade500],
+        maxLines: 3,
+        // Tambah tinggi card
+        height: 120,
+      ),
+      _buildStatCardV2(
+        icon: Icons.directions_bus_rounded,
+        title: assignedBusTitle,
+        value: assignedBusValue,
+        gradientColors: [Colors.orange.shade300, Colors.orange.shade500],
+        maxLines: 2,
+        height: 120,
+      ),
+      _buildStatCardV2(
+        icon: Icons.groups_rounded,
+        title: 'Total Passengers',
+        value: totalPassengersValue,
+        gradientColors: [Colors.green.shade300, Colors.green.shade500],
+        height: 120,
+      ),
+      _buildStatCardV2(
+        icon: Icons.access_time_rounded,
+        title: 'Last Confirmation',
+        value: lastConfirmationValue,
+        gradientColors: [Colors.grey.shade500, Colors.grey.shade700],
+        height: 120,
+      ),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Quick Stats',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: responsiveFont(14, context), // MODIFIED
-            color: kPrimaryBlue,
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: kSpacing),
+          child: Text(
+            'Quick Stats',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.bold,
+              fontSize: responsiveFont(18, context),
+              color: kPrimaryBlue,
+            ),
           ),
         ),
-        SizedBox(height: responsiveFont(16, context)),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.route_rounded,
-                title: 'Today\'s Route',
-                value: todayRouteValue,
-                color: kPrimaryBlue,
-              ),
-            ),
-            SizedBox(width: responsiveFont(16, context)),
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.directions_bus_rounded,
-                title: 'Assigned Bus',
-                value: _isLoadingBus
-                    ? 'Loading...'
-                    : _busErrorMessage != null
-                    ? 'Error loading bus'
-                    : _assignedBus != null
-                    ? '${_assignedBus!['model_name']} - ${_assignedBus!['license_plate']}'
-                    : 'No bus assigned',
-                color: kAccentGold,
-              ),
-            ),
-          ],
+        const SizedBox(height: kSpacing),
+        SizedBox(
+          height: 140, // atur tinggi sesuai kebutuhan
+          child: PageView.builder(
+            controller: _statCardController,
+            itemCount: statCards.length,
+            onPageChanged: (index) {
+              setState(() {
+                _currentStatCardPage = index;
+              });
+            },
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: statCards[index],
+              );
+            },
+          ),
         ),
-        SizedBox(height: responsiveFont(16, context)),
+        const SizedBox(height: 12),
         Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.groups_rounded,
-                title: 'Total Passengers',
-                value: totalPassengersValue,
-                color: kSoftGold,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(statCards.length, (index) {
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              width: _currentStatCardPage == index ? 18 : 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: _currentStatCardPage == index
+                    ? kPrimaryBlue
+                    : Colors.grey[400],
+                borderRadius: BorderRadius.circular(4),
               ),
-            ),
-            SizedBox(width: responsiveFont(16, context)),
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.access_time_rounded,
-                title: 'Last Confirmation',
-                value: lastConfirmationValue,
-                color: kSlateGray,
-              ),
-            ),
-          ],
+            );
+          }),
         ),
       ],
     );
   }
 
   Widget _buildPassengerStatsSection() {
-    // Data dummy, bisa diganti dengan data asli jika ada
     int totalTrips = _recentBusTrips.length;
     int activeTrips = _recentBusTrips.where((t) {
       final now = DateTime.now();
@@ -899,7 +1233,8 @@ class _HomeScreenState extends State<HomeScreen> {
       0,
       (sum, t) => sum + (t.seatBooked ?? 0),
     );
-    int activeRoutes = 8; // Dummy, bisa diganti jika ada data
+    // Hitung jumlah rute unik dari data real
+    int activeRoutes = _recentBusTrips.map((t) => t.routeId).toSet().length;
 
     final stats = [
       {
@@ -928,105 +1263,136 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     ];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Your Stats',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: responsiveFont(14, context), // MODIFIED
-            color: kPrimaryBlue,
-            letterSpacing: 0.5,
-          ),
-        ),
-        SizedBox(height: responsiveFont(16, context)),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth > 400;
-            final isVerySmall = constraints.maxWidth < 340;
-            return Wrap(
-              spacing: responsiveFont(16, context),
-              runSpacing: responsiveFont(16, context),
-              children: stats.map((stat) {
-                return Container(
-                  width: isWide
-                      ? (constraints.maxWidth - responsiveFont(16, context)) / 2
-                      : constraints.maxWidth,
-                  constraints: BoxConstraints(
-                    minWidth: isVerySmall ? 120 : 140,
-                    maxWidth: isVerySmall ? 200 : 260,
-                  ),
-                  padding: EdgeInsets.all(responsiveFont(18, context)),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                        color: kPrimaryBlue.withOpacity(0.06),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+    return StatefulBuilder(
+      builder: (context, setState) {
+        // Simpan controller dan timer di closure agar tidak recreate setiap build
+        final _state = _PassengerStatCarouselStateHolder.of(context);
+        if (_state == null) {
+          return const SizedBox();
+        }
+        final _passengerStatController = _state.controller;
+        final _currentPassengerStatPage = _state.currentPage;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 16.0),
+              child: Text(
+                'Your Stats',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.bold,
+                  fontSize: responsiveFont(18, context), // MODIFIED
+                  color: kPrimaryBlue,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+            SizedBox(height: responsiveFont(8, context)),
+            SizedBox(
+              height: 110,
+              child: PageView.builder(
+                controller: _passengerStatController,
+                itemCount: stats.length,
+                onPageChanged: (index) {
+                  _state.setCurrentPage(index);
+                },
+                itemBuilder: (context, index) {
+                  final stat = stats[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Container(
+                      width: 220,
+                      padding: EdgeInsets.all(responsiveFont(18, context)),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: kPrimaryBlue.withOpacity(0.06),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                        border: Border.all(
+                          color: kAccentGold.withOpacity(0.13),
+                          width: 1.1,
+                        ),
                       ),
-                    ],
-                    border: Border.all(
-                      color: kAccentGold.withOpacity(0.13),
-                      width: 1.1,
+                      child: Row(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: (stat['color'] as Color).withOpacity(0.13),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: EdgeInsets.all(
+                              responsiveFont(10, context),
+                            ),
+                            child: Icon(
+                              stat['icon'] as IconData,
+                              color: stat['color'] as Color,
+                              size: responsiveFont(32, context), // MODIFIED
+                            ),
+                          ),
+                          SizedBox(width: responsiveFont(14, context)),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  stat['label'] as String,
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    color: kSlateGray,
+                                    fontSize: responsiveFont(13.5, context),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(height: responsiveFont(4, context)),
+                                Text(
+                                  stat['value'] as String,
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    color: stat['color'] as Color,
+                                    fontSize: responsiveFont(18, context),
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: (stat['color'] as Color).withOpacity(0.13),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: EdgeInsets.all(responsiveFont(10, context)),
-                        child: Icon(
-                          stat['icon'] as IconData,
-                          color: stat['color'] as Color,
-                          size: responsiveFont(22, context), // MODIFIED
-                        ),
-                      ),
-                      SizedBox(width: responsiveFont(14, context)),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              stat['label'] as String,
-                              style: TextStyle(
-                                color: kSlateGray,
-                                fontSize: responsiveFont(
-                                  11.5,
-                                  context,
-                                ), // MODIFIED
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            SizedBox(height: responsiveFont(4, context)),
-                            Text(
-                              stat['value'] as String,
-                              style: TextStyle(
-                                color: stat['color'] as Color,
-                                fontSize: responsiveFont(
-                                  14,
-                                  context,
-                                ), // MODIFIED
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(stats.length, (index) {
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: _currentPassengerStatPage == index ? 18 : 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: _currentPassengerStatPage == index
+                        ? kPrimaryBlue
+                        : Colors.grey[400],
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 );
-              }).toList(),
-            );
-          },
-        ),
-      ],
+              }),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1035,6 +1401,8 @@ class _HomeScreenState extends State<HomeScreen> {
     required String title,
     required String value,
     required Color color,
+    double? minHeight,
+    int? maxLines,
   }) {
     return Container(
       padding: EdgeInsets.all(responsiveFont(16, context)),
@@ -1049,6 +1417,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      constraints: minHeight != null
+          ? BoxConstraints(minHeight: minHeight)
+          : null,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1063,6 +1434,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Text(
               title,
               style: TextStyle(
+                fontFamily: 'Poppins',
                 color: kSlateGray,
                 fontSize: responsiveFont(12, context), // MODIFIED
                 fontWeight: FontWeight.w500,
@@ -1076,15 +1448,157 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Text(
               value,
               style: TextStyle(
+                fontFamily: 'Poppins',
                 color: color,
                 fontSize: responsiveFont(14, context), // MODIFIED
                 fontWeight: FontWeight.bold,
               ),
               overflow: TextOverflow.ellipsis,
-              maxLines: 1,
+              maxLines: maxLines ?? 1,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Panggil widget ini dengan .animate() dari flutter_animate untuk efek masuk
+  // Contoh: _buildStatCardV2(...).animate().fadeIn().slideX()
+
+  Widget _buildStatCardV2({
+    required IconData icon,
+    required String title,
+    required String value,
+    required List<Color> gradientColors,
+    int maxLines = 2,
+    Widget? badgeWidget, // Badge di pojok kanan atas
+    Widget? actionWidget, // Tombol edit di samping judul
+    Widget? badgeBelowIconWidget, // Badge di bawah ikon (sudah diperbaiki)
+    double? height,
+    VoidCallback? onTap,
+  }) {
+    // --- UI Constants ---
+    const double kCardWidth = 150.0;
+    const double kCardHeight = 120.0;
+    const double kIconCircleRadius = 22.0;
+    const double kIconSize = 24.0;
+    const double kTitleFontSize = 12.0;
+    const double kValueFontSize = 15.0;
+
+    // Gunakan style yang sama dengan _buildDriverBusStatusCard
+    return SizedBox(
+      width: kCardWidth,
+      height: height ?? kCardHeight,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20.0),
+        child: Container(
+          padding: const EdgeInsets.all(16.0),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                gradientColors.first.withOpacity(0.13),
+                gradientColors.last.withOpacity(0.22),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: gradientColors.last.withOpacity(0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: Border.all(
+              color: gradientColors.last.withOpacity(0.18),
+              width: 1.2,
+            ),
+          ),
+          child: Stack(
+            children: [
+              // Konten utama kartu
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Bagian atas: Ikon dan badge di bawahnya
+                  Column(
+                    children: [
+                      CircleAvatar(
+                        radius: kIconCircleRadius,
+                        backgroundColor: gradientColors.first.withOpacity(0.18),
+                        child: Icon(
+                          icon,
+                          color: gradientColors.first,
+                          size: kIconSize,
+                        ),
+                      ),
+                      if (badgeBelowIconWidget != null) ...[
+                        const SizedBox(height: 6),
+                        Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 110),
+                            child: DefaultTextStyle(
+                              style: const TextStyle(
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              child: badgeBelowIconWidget,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  // Bagian bawah: Teks dan Tombol Edit
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                color: kPrimaryBlue,
+                                fontSize: kTitleFontSize,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (actionWidget != null) ...[
+                            const SizedBox(width: 4),
+                            actionWidget,
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        value,
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          color: gradientColors.last,
+                          fontSize: kValueFontSize,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: maxLines,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              // Badge di pojok kanan atas (jika ada)
+              if (badgeWidget != null)
+                Positioned(top: 0, right: 0, child: badgeWidget),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1104,9 +1618,11 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Text(
                 'Recent Trips',
                 style: TextStyle(
+                  fontFamily: 'Poppins',
                   fontWeight: FontWeight.bold,
-                  fontSize: responsiveFont(14, context), // MODIFIED
+                  fontSize: responsiveFont(18, context), // MODIFIED
                   color: kPrimaryBlue,
+                  letterSpacing: 0.5,
                 ),
               ),
             ),
@@ -1130,9 +1646,9 @@ class _HomeScreenState extends State<HomeScreen> {
               label: Text(
                 'View All',
                 style: TextStyle(
-                  color: kAccentGold,
-                  fontSize: responsiveFont(12, context), // MODIFIED
+                  fontFamily: 'Poppins',
                   fontWeight: FontWeight.w600,
+                  fontSize: responsiveFont(12, context), // MODIFIED
                 ),
               ),
               style: TextButton.styleFrom(
@@ -1144,22 +1660,37 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        SizedBox(height: responsiveFont(16, context)),
+        SizedBox(height: responsiveFont(8, context)), // was 16
         if (_isLoadingTrips)
           const Center(child: CircularProgressIndicator())
         else if (_errorMessage != null)
           Center(
             child: Text(
               _errorMessage!,
-              style: const TextStyle(color: kSlateGray),
+              style: const TextStyle(color: kSlateGray, fontFamily: 'Poppins'),
               textAlign: TextAlign.center,
             ),
           )
         else if (_recentBusTrips == null || _recentBusTrips.isEmpty)
-          const Center(
-            child: Text(
-              'No recent bus trips',
-              style: TextStyle(color: kSlateGray),
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/image/empty_state.png',
+                  width: 150,
+                  height: 150,
+                  fit: BoxFit.contain,
+                ),
+                const Text(
+                  'No recent bus trips',
+                  style: TextStyle(
+                    color: kSlateGray,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           )
         else
@@ -1276,6 +1807,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: Text(
                                 _formatDate(trip.tripDate),
                                 style: TextStyle(
+                                  fontFamily: 'Poppins',
                                   fontWeight: FontWeight.bold,
                                   fontSize: responsiveFont(
                                     14,
@@ -1297,6 +1829,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: Text(
                                 '${trip.boardingPointName ?? ''} ',
                                 style: TextStyle(
+                                  fontFamily: 'Poppins',
                                   fontWeight: FontWeight.bold,
                                   fontSize: responsiveFont(
                                     14,
@@ -1317,6 +1850,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: Text(
                                 ' ${trip.dropPointName ?? ''}',
                                 style: TextStyle(
+                                  fontFamily: 'Poppins',
                                   fontWeight: FontWeight.bold,
                                   fontSize: responsiveFont(
                                     14,
@@ -1342,6 +1876,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             Text(
                               _formatTime(trip.startTime),
                               style: TextStyle(
+                                fontFamily: 'Poppins',
                                 color: Colors.green,
                                 fontWeight: FontWeight.w600,
                                 fontSize: responsiveFont(
@@ -1360,6 +1895,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             Text(
                               _formatTime(trip.endTime),
                               style: TextStyle(
+                                fontFamily: 'Poppins',
                                 color: Colors.red,
                                 fontWeight: FontWeight.w600,
                                 fontSize: responsiveFont(
@@ -1383,6 +1919,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: Text(
                                 trip.userIdName ?? '',
                                 style: TextStyle(
+                                  fontFamily: 'Poppins',
                                   color: kSlateGray,
                                   fontSize: responsiveFont(
                                     11,
@@ -1438,6 +1975,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 child: Text(
                                   badgeLabel,
                                   style: TextStyle(
+                                    fontFamily: 'Poppins',
                                     color: badgeLabel == 'Waiting'
                                         ? Colors.black
                                         : Colors.white,
@@ -1467,6 +2005,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 child: Text(
                                   trip.busInfo ?? '',
                                   style: TextStyle(
+                                    fontFamily: 'Poppins',
                                     color: kPrimaryBlue,
                                     fontWeight: FontWeight.w600,
                                     fontSize: responsiveFont(
@@ -1505,6 +2044,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   Text(
                                     (trip.seatBooked ?? 0).toString(),
                                     style: TextStyle(
+                                      fontFamily: 'Poppins',
                                       color: kPrimaryBlue,
                                       fontWeight: FontWeight.w600,
                                       fontSize: responsiveFont(
@@ -1560,8 +2100,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Text(
                   sectionLabel,
                   style: TextStyle(
+                    fontFamily: 'Poppins',
                     fontWeight: FontWeight.bold,
-                    fontSize: responsiveFont(14, context), // MODIFIED
+                    fontSize: responsiveFont(18, context), // MODIFIED
                     color: kPrimaryBlue,
                   ),
                 ),
@@ -1588,15 +2129,25 @@ class _HomeScreenState extends State<HomeScreen> {
             Center(
               child: Text(
                 _routeErrorMessage!,
-                style: const TextStyle(color: kSlateGray),
+                style: const TextStyle(
+                  color: kSlateGray,
+                  fontFamily: 'Poppins',
+                ),
                 textAlign: TextAlign.center,
               ),
             )
           else if (_routesToConfirm.isEmpty)
             const Center(
-              child: Text(
-                'No routes to confirm',
-                style: TextStyle(color: kSlateGray),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.route, color: kSlateGray, size: 48),
+                  SizedBox(height: 12),
+                  Text(
+                    'No routes to confirm',
+                    style: TextStyle(color: kSlateGray, fontFamily: 'Poppins'),
+                  ),
+                ],
               ),
             )
           else
@@ -1634,103 +2185,174 @@ class _HomeScreenState extends State<HomeScreen> {
     int? tempStatus = _filterStatusSeq;
     DateTime tempStart = _filterStartDate;
     DateTime tempEnd = _filterEndDate;
+
     await showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.6),
       builder: (ctx) {
         return StatefulBuilder(
-          builder: (ctx, setState) {
-            return AlertDialog(
-              title: const Text('Filter Trip'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DropdownButtonFormField<int?>(
-                      value: tempStatus,
-                      decoration: const InputDecoration(labelText: 'Status'),
-                      items: const [
-                        DropdownMenuItem(value: null, child: Text('Semua')),
-                        DropdownMenuItem(value: 0, child: Text('Ready')),
-                        DropdownMenuItem(
-                          value: 1,
-                          child: Text('Trip Confirmed'),
-                        ),
-                        DropdownMenuItem(value: 2, child: Text('On Trip')),
-                        DropdownMenuItem(value: 3, child: Text('End Trip')),
-                      ],
-                      onChanged: (v) => setState(() => tempStatus = v),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: () async {
-                              final picked = await showDatePicker(
-                                context: ctx,
-                                initialDate: tempStart,
-                                firstDate: DateTime(2023),
-                                lastDate: DateTime(2100),
-                              );
-                              if (picked != null)
-                                setState(() => tempStart = picked);
-                            },
-                            child: InputDecorator(
-                              decoration: const InputDecoration(
-                                labelText: 'Start Date',
-                              ),
-                              child: Text(
-                                DateFormat('yyyy-MM-dd').format(tempStart),
-                              ),
+          builder: (context, setState) {
+            final statusItems = {
+              null: 'Semua',
+              0: 'Ready',
+              1: 'Trip Confirmed',
+              2: 'On Trip',
+              3: 'End Trip',
+            };
+
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20.0),
+              ),
+              elevation: 8,
+              backgroundColor: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: SingleChildScrollView(
+                  // Tambahkan SingleChildScrollView untuk layar kecil
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // --- JUDUL ---
+                      // Ukuran font 20.0, cukup besar untuk menjadi judul tapi tidak dominan.
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.filter_list_rounded,
+                            color: Colors.blueAccent,
+                            size: 26,
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Filter Perjalanan',
+                            style: TextStyle(
+                              fontSize: 20.0, // Ukuran judul yang lebih ringkas
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: InkWell(
-                            onTap: () async {
-                              final picked = await showDatePicker(
-                                context: ctx,
-                                initialDate: tempEnd,
-                                firstDate: DateTime(2023),
-                                lastDate: DateTime(2100),
-                              );
-                              if (picked != null)
-                                setState(() => tempEnd = picked);
-                            },
-                            child: InputDecorator(
-                              decoration: const InputDecoration(
-                                labelText: 'End Date',
-                              ),
-                              child: Text(
-                                DateFormat('yyyy-MM-dd').format(tempEnd),
-                              ),
-                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // --- FILTER STATUS ---
+                      // Ukuran font 14.0 untuk item dan teks terpilih.
+                      DropdownButtonFormField<int?>(
+                        value: tempStatus,
+                        style: const TextStyle(
+                          fontSize: 14.0,
+                          color: Colors.black87,
+                          fontFamily: 'YourAppFont',
+                        ), // Atur style teks terpilih
+                        decoration: InputDecoration(
+                          labelText: 'Status',
+                          prefixIcon: const Icon(Icons.flag_outlined, size: 20),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12.0),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 12,
                           ),
                         ),
-                      ],
-                    ),
-                  ],
+                        items: statusItems.entries.map((entry) {
+                          return DropdownMenuItem(
+                            value: entry.key,
+                            child: Text(
+                              entry.value,
+                              style: const TextStyle(fontSize: 14.0),
+                            ), // Font untuk item di daftar
+                          );
+                        }).toList(),
+                        onChanged: (v) => setState(() => tempStatus = v),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // --- FILTER TANGGAL ---
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildDatePickerField(
+                              context: context,
+                              labelText: 'Mulai',
+                              selectedDate: tempStart,
+                              onDatePicked: (pickedDate) {
+                                setState(() => tempStart = pickedDate);
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildDatePickerField(
+                              context: context,
+                              labelText: 'Selesai',
+                              selectedDate: tempEnd,
+                              onDatePicked: (pickedDate) {
+                                setState(() => tempEnd = pickedDate);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+
+                      // --- TOMBOL AKSI ---
+                      // Ukuran font 14.0 untuk konsistensi.
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            style: TextButton.styleFrom(
+                              textStyle: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            child: const Text('Batal'),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              _filterStatusSeq = tempStatus;
+                              _filterStartDate = tempStart;
+                              _filterEndDate = tempEnd;
+                              _loadRoutesToConfirm();
+                              Navigator.of(context).pop();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueAccent,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12.0),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
+                              elevation: 4,
+                              textStyle: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            icon: const Icon(
+                              Icons.check_circle_outline,
+                              size: 18,
+                            ),
+                            label: const Text('Terapkan'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _filterStatusSeq = tempStatus;
-                      _filterStartDate = tempStart;
-                      _filterEndDate = tempEnd;
-                    });
-                    _loadRoutesToConfirm();
-                    Navigator.of(ctx).pop();
-                  },
-                  child: const Text('Apply'),
-                ),
-              ],
             );
           },
         );
@@ -1738,54 +2360,125 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Widget helper untuk field tanggal dengan font 14.0
+  Widget _buildDatePickerField({
+    required BuildContext context,
+    required String labelText,
+    required DateTime selectedDate,
+    required ValueChanged<DateTime> onDatePicked,
+  }) {
+    return InkWell(
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: selectedDate,
+          firstDate: DateTime(2023),
+          lastDate: DateTime(2100),
+          builder: (context, child) {
+            return Theme(
+              data: ThemeData.light().copyWith(
+                colorScheme: const ColorScheme.light(
+                  primary: Colors.blueAccent,
+                  onPrimary: Colors.white,
+                ),
+              ),
+              child: child!,
+            );
+          },
+        );
+        if (picked != null && picked != selectedDate) {
+          onDatePicked(picked);
+        }
+      },
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: labelText,
+          prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20),
+          filled: true,
+          fillColor: Colors.grey[50],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 16,
+            horizontal: 12,
+          ),
+        ),
+        child: Text(
+          DateFormat('dd MMM yyyy').format(selectedDate),
+          style: const TextStyle(
+            fontSize: 14.0,
+            color: Colors.black87,
+          ), // Font utama untuk tanggal
+        ),
+      ),
+    );
+  }
+
+  // WIDGET CARD UTAMA (dengan tombol yang sudah dimodifikasi)
   Widget _buildConfirmCard({
     required BusTrip trip,
     String actionLabel = 'Confirm',
     int nextStatusSeq = 1,
     String popupMsg = '',
   }) {
+    // --- Helper & Logic ---
     String formatTripDate(String? dateStr) {
       try {
-        if (dateStr == null || dateStr.isEmpty) return '';
+        if (dateStr == null || dateStr.isEmpty) return 'No Date';
         final date = DateTime.parse(dateStr);
         return DateFormat('dd MMM yyyy').format(date);
       } catch (_) {
-        return dateStr ?? '';
+        return dateStr ?? 'Invalid Date';
       }
     }
 
     // Status logic
-    int statusSeq = trip.statusSeq ?? 0;
-    String statusLabel = 'Ready';
-    Color statusColor = Colors.grey;
+    final int statusSeq = trip.statusSeq ?? 0;
+    String statusLabel;
+    Color statusColor;
     switch (statusSeq) {
-      case 0:
-        statusLabel = 'Ready';
-        statusColor = Colors.grey;
-        break;
       case 1:
         statusLabel = 'Trip Confirmed';
-        statusColor = Colors.blue;
+        statusColor = Colors.blue.shade600;
         break;
       case 2:
         statusLabel = 'On Trip';
-        statusColor = Colors.green;
+        statusColor = Colors.green.shade600;
         break;
       case 3:
         statusLabel = 'End Trip';
-        statusColor = Colors.red;
+        statusColor = Colors.red.shade600;
         break;
+      default: // case 0
+        statusLabel = 'Ready';
+        statusColor = Colors.grey.shade600;
     }
 
-    final screenWidth = MediaQuery.of(context).size.width;
-    final cardPadding = screenWidth < 360 ? 12.0 : 18.0;
-    final iconPadding = screenWidth < 360 ? 6.0 : 8.0;
-    final iconSize = screenWidth < 360 ? 18.0 : 20.0; // MODIFIED
-    final maxCardWidth = 500.0;
+    // --- UI Constants for Readability ---
+    const double kCardPadding = 16.0;
+    const double kIconPadding = 10.0;
+    const double kIconSize = 22.0;
+    const double kHorizontalSpacing = 16.0;
+    const double kVerticalSpacing = 8.0;
 
+    // Font Sizes
+    const double kTitleFontSize = 14.0;
+    const double kSubtitleFontSize = 13.0;
+    const double kInfoFontSize = 12.0;
+
+    // Colors (asumsi kPrimaryBlue, kAccentGold, dll sudah didefinisikan di scope yang lebih tinggi)
+    // static const kPrimaryBlue = Color(0xFF163458);
+    // static const kAccentGold = Color(0xFFE0B352);
+    // static const kSlateGray = Color(0xFF4C5C74);
+
+    // --- WIDGET TREE ---
     return Center(
       child: Container(
-        constraints: BoxConstraints(maxWidth: maxCardWidth),
+        // Dekorasi card Anda sudah sangat baik dan modern, kita pertahankan.
+        constraints: const BoxConstraints(maxWidth: 500.0),
+        margin: const EdgeInsets.only(bottom: 16.0),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -1796,73 +2489,70 @@ class _HomeScreenState extends State<HomeScreen> {
               offset: const Offset(0, 6),
             ),
           ],
-          border: Border.all(color: kAccentGold.withOpacity(0.18), width: 1.2),
+          border: Border.all(color: kAccentGold.withOpacity(0.2), width: 1.2),
         ),
-        margin: EdgeInsets.only(bottom: responsiveFont(18, context)),
         child: Padding(
-          padding: EdgeInsets.all(cardPadding),
+          padding: const EdgeInsets.all(kCardPadding),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Icon
               Container(
                 decoration: BoxDecoration(
                   color: kAccentGold.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                padding: EdgeInsets.all(iconPadding),
-                child: Icon(
+                padding: const EdgeInsets.all(kIconPadding),
+                child: const Icon(
                   Icons.directions_bus_rounded,
                   color: kAccentGold,
-                  size: iconSize,
+                  size: kIconSize,
                 ),
               ),
-              SizedBox(width: responsiveFont(18, context)),
+              const SizedBox(width: kHorizontalSpacing),
+              // Content Column
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // First row with date, bus info, and status
-                    Wrap(
-                      spacing: responsiveFont(8, context),
-                      runSpacing: responsiveFont(6, context),
+                    // Row 1: Bus Info & Status
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Flexible(
-                          child: Text(
-                            formatTripDate(trip.tripDate),
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: responsiveFont(16, context), // MODIFIED
-                              color: kAccentGold,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${trip.busFleetType} / ${trip.busPlate}',
+                                style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: kTitleFontSize,
+                                  color: kPrimaryBlue,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                formatTripDate(trip.tripDate),
+                                style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: kInfoFontSize,
+                                  color: kAccentGold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        // Status Badge
                         Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: responsiveFont(8, context),
-                            vertical: responsiveFont(2, context),
-                          ),
-                          decoration: BoxDecoration(
-                            color: kBlueTint,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${trip.busFleetType} / ${trip.busPlate}',
-                            style: TextStyle(
-                              color: kPrimaryBlue,
-                              fontWeight: FontWeight.w600,
-                              fontSize: responsiveFont(12, context), // MODIFIED
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ),
-                        // Status badge
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: responsiveFont(10, context),
-                            vertical: responsiveFont(4, context),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
                           ),
                           decoration: BoxDecoration(
                             color: statusColor.withOpacity(0.15),
@@ -1871,194 +2561,169 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Text(
                             statusLabel,
                             style: TextStyle(
-                              color: statusColor,
+                              fontFamily: 'Poppins',
                               fontWeight: FontWeight.bold,
-                              fontSize: responsiveFont(12, context), // MODIFIED
+                              fontSize: kInfoFontSize,
+                              color: statusColor,
                             ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: responsiveFont(8, context)),
-                    // Route information
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            '${trip.boardingPointName} → ${trip.dropPointName}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: responsiveFont(15, context), // MODIFIED
-                              color: kPrimaryBlue,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: kVerticalSpacing),
+                    // Route Information
+                    Text(
+                      '${trip.boardingPointName} → ${trip.dropPointName}',
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w500,
+                        fontSize: kSubtitleFontSize,
+                        color: kPrimaryBlue,
+                      ),
+                      maxLines: 2, // Allow up to 2 lines for long routes
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    SizedBox(height: responsiveFont(8, context)),
-                    // Driver and passenger info
+                    const SizedBox(height: kVerticalSpacing),
+                    // Driver and Passenger Info
                     Row(
                       children: [
-                        Icon(
-                          Icons.person,
-                          color: kSlateGray,
-                          size: responsiveFont(18, context), // MODIFIED
-                        ),
-                        SizedBox(width: responsiveFont(6, context)),
-                        Flexible(
+                        const Icon(Icons.person, color: kSlateGray, size: 16),
+                        const SizedBox(width: 6),
+                        Expanded(
                           child: Text(
                             trip.userIdName,
-                            style: TextStyle(
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
                               color: kSlateGray,
-                              fontSize: responsiveFont(13, context), // MODIFIED
+                              fontSize: kInfoFontSize,
                             ),
-                            overflow: TextOverflow.ellipsis,
                             maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        Spacer(),
-                        Icon(
+                        const SizedBox(width: 8),
+                        const Icon(
                           Icons.groups_rounded,
-                          color: kSoftGold,
-                          size: responsiveFont(16, context), // MODIFIED
+                          color: kSlateGray,
+                          size: 16,
                         ),
-                        SizedBox(width: responsiveFont(6, context)),
+                        const SizedBox(width: 4),
                         Text(
                           (trip.seatBooked).toString(),
-                          style: TextStyle(
+                          style: const TextStyle(
+                            fontFamily: 'Poppins',
                             color: kPrimaryBlue,
                             fontWeight: FontWeight.bold,
-                            fontSize: responsiveFont(12, context), // MODIFIED
+                            fontSize: kInfoFontSize,
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: responsiveFont(14, context)),
-                    // Action button
-                    if (statusLabel != 'End Trip')
+                    // Action Button
+                    if (statusLabel != 'End Trip') ...[
+                      const SizedBox(height: 14),
                       Align(
                         alignment: Alignment.centerRight,
-                        child: Builder(
-                          builder: (context) {
-                            return ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: kAccentGold,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: responsiveFont(16, context),
-                                  vertical: responsiveFont(8, context),
-                                ),
-                              ),
-                              onPressed: () async {
-                                final confirmed = await showDialog<bool>(
+                        child: ElevatedButton.icon(
+                          // Menggunakan ElevatedButton.icon untuk konsistensi
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kAccentGold,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            elevation: 2,
+                            textStyle: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons.check_circle_outline,
+                            size: 16,
+                          ),
+                          label: Text(actionLabel),
+                          onPressed: () async {
+                            // Tampilkan dialog konfirmasi modern kita
+                            final bool? confirmed =
+                                await _showModernConfirmDialog(
                                   context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    title: Text(actionLabel),
-                                    content: Text(popupMsg),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.of(ctx).pop(false),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      ElevatedButton(
-                                        onPressed: () =>
-                                            Navigator.of(ctx).pop(true),
-                                        child: Text(actionLabel),
-                                      ),
-                                    ],
-                                  ),
+                                  title: actionLabel,
+                                  content: popupMsg,
+                                  confirmColor: kAccentGold,
                                 );
-                                if (confirmed == true) {
-                                  showDialog(
-                                    context: context,
-                                    barrierDismissible: false,
-                                    builder: (ctx) => const Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
+
+                            if (confirmed == true) {
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (ctx) => const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              );
+
+                              // Call both APIs in parallel
+                              final vehicleResult = await _fleetService
+                                  .updateVehicleStatus(
+                                    busId: trip.busId,
+                                    statusSeq: nextStatusSeq,
                                   );
 
-                                  // Call both APIs in parallel
-                                  final vehicleResult = await _fleetService
-                                      .updateVehicleStatus(
-                                        busId: trip.busId,
-                                        statusSeq: nextStatusSeq,
-                                      );
+                              final tripStateResult = await _busTripService
+                                  .updateBusTripState(
+                                    tripId: trip.id,
+                                    state: nextStatusSeq.toString(),
+                                    // state: _getStateFromStatusSeq(
+                                    //   nextStatusSeq,
+                                    // ),
+                                  );
 
-                                  final tripStateResult = await _busTripService
-                                      .updateBusTripState(
-                                        tripId: trip.id,
-                                        state: nextStatusSeq.toString(),
-                                        // state: _getStateFromStatusSeq(
-                                        //   nextStatusSeq,
-                                        // ),
-                                      );
+                              Navigator.of(
+                                context,
+                                rootNavigator: true,
+                              ).pop(); // remove loading
 
-                                  Navigator.of(
-                                    context,
-                                    rootNavigator: true,
-                                  ).pop(); // remove loading
-
-                                  // Check if both operations were successful
-                                  if (vehicleResult['status'] == true &&
-                                      tripStateResult['status'] == true) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            '$actionLabel success!',
-                                          ),
-                                        ),
-                                      );
-                                      await _loadRoutesToConfirm();
-                                    }
-                                  } else {
-                                    if (mounted) {
-                                      // Show error message from the failed operation
-                                      String errorMessage = '';
-                                      if (vehicleResult['status'] != true) {
-                                        errorMessage =
-                                            vehicleResult['message'] ??
-                                            'Failed to update vehicle status';
-                                      } else if (tripStateResult['status'] !=
-                                          true) {
-                                        errorMessage =
-                                            tripStateResult['message'] ??
-                                            'Failed to update trip state';
-                                      }
-
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(content: Text(errorMessage)),
-                                      );
-                                    }
-                                  }
+                              // Check if both operations were successful
+                              if (vehicleResult['status'] == true &&
+                                  tripStateResult['status'] == true) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('$actionLabel success!'),
+                                    ),
+                                  );
+                                  await _loadRoutesToConfirm();
                                 }
-                              },
-                              child: Text(
-                                actionLabel,
-                                style: TextStyle(
-                                  fontSize: responsiveFont(
-                                    13,
-                                    context,
-                                  ), // MODIFIED
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            );
+                              } else {
+                                if (mounted) {
+                                  // Show error message from the failed operation
+                                  String errorMessage = '';
+                                  if (vehicleResult['status'] != true) {
+                                    errorMessage =
+                                        vehicleResult['message'] ??
+                                        'Failed to update vehicle status';
+                                  } else if (tripStateResult['status'] !=
+                                      true) {
+                                    errorMessage =
+                                        tripStateResult['message'] ??
+                                        'Failed to update trip state';
+                                  }
+
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(errorMessage)),
+                                  );
+                                }
+                              }
+                            }
                           },
                         ),
                       ),
+                    ],
                   ],
                 ),
               ),
@@ -2066,6 +2731,106 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  // --- HELPER DIALOG BARU YANG MODERN & REUSABLE ---
+  // Letakkan fungsi ini di dalam kelas State atau di luar jika tidak butuh akses `this`.
+  Future<bool?> _showModernConfirmDialog({
+    required BuildContext context,
+    required String title,
+    required String content,
+    Color confirmColor = Colors.blueAccent,
+  }) async {
+    return await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.6),
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          elevation: 8,
+          backgroundColor: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    Icon(
+                      Icons.help_outline_rounded,
+                      color: confirmColor,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 20.0,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Content
+                if (content.isNotEmpty)
+                  Text(
+                    content,
+                    textAlign: TextAlign.start,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Colors.grey.shade700,
+                      height: 1.5,
+                    ),
+                  ),
+                const SizedBox(height: 24),
+                // Actions
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () =>
+                          Navigator.of(context).pop(false), // Return false
+                      child: const Text(
+                        'Batal',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: () =>
+                          Navigator.of(context).pop(true), // Return true
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: confirmColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      icon: const Icon(Icons.check, size: 18),
+                      label: const Text('Ya, Lanjutkan'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -2097,8 +2862,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: Text(
                   'Add New Trip',
                   style: TextStyle(
-                    fontSize: responsiveFont(13, context), // MODIFIED
+                    fontFamily: 'Poppins',
                     fontWeight: FontWeight.w600,
+                    fontSize: responsiveFont(13, context), // MODIFIED
                   ),
                 ),
                 onPressed: () {
@@ -2132,8 +2898,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: Text(
                   'View Bus Trip History',
                   style: TextStyle(
-                    fontSize: responsiveFont(13, context), // MODIFIED
+                    fontFamily: 'Poppins',
                     fontWeight: FontWeight.w600,
+                    fontSize: responsiveFont(13, context), // MODIFIED
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -2181,8 +2948,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: Text(
                   'My History',
                   style: TextStyle(
-                    fontSize: responsiveFont(13, context), // MODIFIED
+                    fontFamily: 'Poppins',
                     fontWeight: FontWeight.w600,
+                    fontSize: responsiveFont(13, context), // MODIFIED
                   ),
                 ),
                 onPressed: () {
@@ -2210,15 +2978,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 icon: Icon(
-                  Icons.edit_rounded,
+                  Icons.add_rounded,
                   size: responsiveFont(18, context), // MODIFIED
                 ),
                 label: Text(
-                  'Edit Passenger Count',
+                  'Add Passenger',
                   style: TextStyle(
-                    fontSize: responsiveFont(13, context), // MODIFIED
+                    fontFamily: 'Poppins',
                     fontWeight: FontWeight.w600,
+                    fontSize: responsiveFont(13, context), // MODIFIED
                   ),
+                  maxLines: 1,
                   textAlign: TextAlign.center,
                 ),
                 onPressed: () async {
@@ -2268,8 +3038,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: Text(
                   'Trip History',
                   style: TextStyle(
-                    fontSize: responsiveFont(13, context), // MODIFIED
+                    fontFamily: 'Poppins',
                     fontWeight: FontWeight.w600,
+                    fontSize: responsiveFont(13, context), // MODIFIED
                   ),
                 ),
                 onPressed: () {
@@ -2303,12 +3074,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: Text(
                   'Find Bus',
                   style: TextStyle(
-                    fontSize: responsiveFont(13, context), // MODIFIED
+                    fontFamily: 'Poppins',
                     fontWeight: FontWeight.w600,
+                    fontSize: responsiveFont(13, context), // MODIFIED
                   ),
                 ),
                 onPressed: () {
-                  // TODO: Implement find bus functionality
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => BusSearchScreen()),
+                  );
                 },
               ),
             ),
@@ -2333,9 +3108,11 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Text(
                 'Recent Plan Trip',
                 style: TextStyle(
+                  fontFamily: 'Poppins',
                   fontWeight: FontWeight.bold,
                   fontSize: responsiveFont(14, context), // MODIFIED
                   color: kPrimaryBlue,
+                  letterSpacing: 0.5,
                 ),
               ),
             ),
@@ -2356,9 +3133,9 @@ class _HomeScreenState extends State<HomeScreen> {
               label: Text(
                 'View All',
                 style: TextStyle(
-                  color: kAccentGold,
-                  fontSize: responsiveFont(12, context), // MODIFIED
+                  fontFamily: 'Poppins',
                   fontWeight: FontWeight.w600,
+                  fontSize: responsiveFont(12, context), // MODIFIED
                 ),
               ),
               style: TextButton.styleFrom(
@@ -2370,14 +3147,14 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        SizedBox(height: responsiveFont(16, context)),
+        SizedBox(height: responsiveFont(8, context)), // was 16
         if (_isLoadingPlanTrips)
           const Center(child: CircularProgressIndicator())
         else if (_planTripErrorMessage != null)
           Center(
             child: Text(
               _planTripErrorMessage!,
-              style: const TextStyle(color: kSlateGray),
+              style: const TextStyle(color: kSlateGray, fontFamily: 'Poppins'),
               textAlign: TextAlign.center,
             ),
           )
@@ -2385,7 +3162,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const Center(
             child: Text(
               'No recent plan trips',
-              style: TextStyle(color: kSlateGray),
+              style: TextStyle(color: kSlateGray, fontFamily: 'Poppins'),
             ),
           )
         else
@@ -2470,6 +3247,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Text(
                               _formatDate(plan['trip_date']),
                               style: TextStyle(
+                                fontFamily: 'Poppins',
                                 fontWeight: FontWeight.bold,
                                 fontSize: responsiveFont(
                                   14,
@@ -2493,7 +3271,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Text(
                               '${plan['bus_name'] ?? ''}',
                               style: TextStyle(
-                                color: kPrimaryBlue,
+                                fontFamily: 'Poppins',
                                 fontWeight: FontWeight.w600,
                                 fontSize: responsiveFont(
                                   12,
@@ -2514,6 +3292,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Text(
                               '${plan['from_name'] ?? ''} → ${plan['to_name'] ?? ''}',
                               style: TextStyle(
+                                fontFamily: 'Poppins',
                                 fontWeight: FontWeight.w600,
                                 fontSize: responsiveFont(
                                   13,
@@ -2541,6 +3320,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Text(
                               plan['user_name'] ?? '',
                               style: TextStyle(
+                                fontFamily: 'Poppins',
                                 color: kSlateGray,
                                 fontSize: responsiveFont(
                                   11,
@@ -2561,6 +3341,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Text(
                             (plan['booked_seat'] ?? 0).toString(),
                             style: TextStyle(
+                              fontFamily: 'Poppins',
                               color: kPrimaryBlue,
                               fontWeight: FontWeight.bold,
                               fontSize: responsiveFont(13, context), // MODIFIED
@@ -2577,6 +3358,606 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  // Widget custom untuk Assigned Bus
+  Widget _buildAssignedBusCard() {
+    if (_isLoadingBus) {
+      return _buildStatCard(
+        icon: Icons.directions_bus_rounded,
+        title: 'Assigned Bus',
+        value: 'Loading...',
+        color: kAccentGold,
+      );
+    }
+    if (_busErrorMessage != null) {
+      return _buildStatCard(
+        icon: Icons.directions_bus_rounded,
+        title: 'Assigned Bus',
+        value: 'Error loading bus',
+        color: kAccentGold,
+      );
+    }
+    if (_assignedBus == null) {
+      return _buildStatCard(
+        icon: Icons.directions_bus_rounded,
+        title: 'Assigned Bus',
+        value: 'No bus assigned',
+        color: kAccentGold,
+      );
+    }
+    int statusSeq = _assignedBus!['status_seq'] ?? 0;
+    String statusLabel = busStatusMap[statusSeq]?['label'] ?? 'Unknown';
+    Color statusColor = busStatusMap[statusSeq]?['color'] ?? Colors.grey;
+    return Container(
+      padding: EdgeInsets.all(responsiveFont(16, context)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: kPrimaryBlue.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.directions_bus_rounded,
+            color: kAccentGold,
+            size: responsiveFont(22, context),
+          ),
+          SizedBox(height: responsiveFont(12, context)),
+          Text(
+            'Assigned Bus',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              color: kSlateGray,
+              fontSize: responsiveFont(12, context),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          SizedBox(height: responsiveFont(4, context)),
+          Text(
+            '${_assignedBus!['model_name']} - ${_assignedBus!['license_plate']}',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              color: kAccentGold,
+              fontSize: responsiveFont(14, context),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: responsiveFont(8, context)),
+          Row(
+            children: [
+              // Badge status
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.bold,
+                    fontSize: responsiveFont(11, context),
+                    color: statusColor,
+                  ),
+                ),
+              ),
+              SizedBox(width: 8),
+              // Tombol edit
+              InkWell(
+                onTap: () => _showEditBusStatusDialog(),
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.all(4.0),
+                  child: Icon(Icons.edit, color: kPrimaryBlue, size: 18),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Dialog untuk edit status bus
+  void _showEditBusStatusDialog() async {
+    if (_assignedBus == null) return;
+    int busId = _assignedBus!['id'];
+    int? tempStatus = _assignedBus!['status_seq'] ?? 0;
+
+    await showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.6),
+      builder: (context) {
+        // Gunakan StatefulBuilder agar pilihan status bisa diperbarui di dalam dialog
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20.0),
+              ),
+              elevation: 8,
+              backgroundColor: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // --- JUDUL DIALOG ---
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.edit_note_rounded,
+                          color: Colors.orangeAccent,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Ubah Status Bus',
+                          style: TextStyle(
+                            fontSize: 20.0,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // --- DAFTAR PILIHAN STATUS ---
+                    // Menggunakan Column dan widget kustom, bukan RadioListTile standar
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: busStatusMap.entries.map((entry) {
+                        final int value = entry.key;
+                        final String label = entry.value['label'];
+                        final Color color = entry.value['color'];
+                        final bool isSelected = tempStatus == value;
+
+                        return _buildStatusOption(
+                          label: label,
+                          color: color,
+                          isSelected: isSelected,
+                          onTap: () {
+                            setState(() => tempStatus = value);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // --- TOMBOL AKSI ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: TextButton.styleFrom(
+                            textStyle: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          child: const Text('Batal'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            if (tempStatus == null) return;
+                            Navigator.of(context).pop();
+                            await _updateBusStatus(busId, tempStatus!);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors
+                                .orangeAccent, // Warna selaras dengan ikon
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            elevation: 4,
+                            textStyle: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons.check_circle_outline,
+                            size: 18,
+                          ),
+                          label: const Text('Perbarui'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Widget helper kustom untuk menggantikan RadioListTile
+  Widget _buildStatusOption({
+    required String label,
+    required Color color,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 5.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.15) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12.0),
+          border: Border.all(
+            color: isSelected ? color : Colors.grey.shade200,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            // Indikator lingkaran berwarna
+            Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color,
+                border: Border.all(color: Colors.white, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Label status
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+            // Ikon radio button
+            Icon(
+              isSelected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              color: isSelected ? color : Colors.grey.shade400,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Method untuk update status bus dan refresh Assigned Bus
+  Future<void> _updateBusStatus(int busId, int statusSeq) async {
+    try {
+      final result = await _fleetService.updateVehicleStatus(
+        busId: busId,
+        statusSeq: statusSeq,
+      );
+      if (result['status'] == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Status bus berhasil diupdate!')),
+          );
+          // Reset cache assigned bus sebelum reload
+          _cachedAssignedBus = null;
+          _cachedAssignedBusTime = null;
+          await _loadAssignedBus();
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Gagal update status bus'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Terjadi error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Section khusus untuk status bus driver (modern, fresh, UX best practice)
+  Widget _buildDriverAssignedBusSection() {
+    if (_isLoadingBus) {
+      return _buildDriverBusStatusCard(
+        title: 'Assigned Bus',
+        value: 'Loading...',
+      );
+    }
+    if (_busErrorMessage != null) {
+      return _buildDriverBusStatusCard(
+        title: 'Assigned Bus',
+        value: 'Error loading bus',
+        color: Colors.red.shade400,
+        icon: Icons.error_outline_rounded,
+      );
+    }
+    if (_assignedBus == null) {
+      return _buildDriverBusStatusCard(
+        title: 'Assigned Bus',
+        value: 'No bus assigned',
+        color: Colors.grey.shade400,
+        icon: Icons.directions_bus_filled,
+      );
+    }
+    int statusSeq = _assignedBus!['status_seq'] ?? 0;
+    String statusLabel = busStatusMap[statusSeq]?['label'] ?? 'Unknown';
+    Color statusColor = busStatusMap[statusSeq]?['color'] ?? Colors.grey;
+    return _buildDriverBusStatusCard(
+      title:
+          '${_assignedBus!['model_name']} - ${_assignedBus!['license_plate']}',
+      value: statusLabel,
+      color: statusColor,
+      icon: Icons.directions_bus_rounded,
+      onEdit: _showEditBusStatusDialog,
+    );
+  }
+
+  // Card modern untuk status bus driver
+  Widget _buildDriverBusStatusCard({
+    required String title,
+    required String value,
+    Color color = kAccentGold,
+    IconData icon = Icons.directions_bus_rounded,
+    VoidCallback? onEdit,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color.withOpacity(0.13), color.withOpacity(0.22)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: color.withOpacity(0.18), width: 1.2),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.all(10),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: kPrimaryBlue,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        value,
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                    if (onEdit != null) ...[
+                      const SizedBox(width: 10),
+                      InkWell(
+                        onTap: onEdit,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4.0),
+                          child: Icon(Icons.edit, color: color, size: 18),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- CLASS BARU UNTUK MEMBUAT BENTUK MELENGKUNG ---
+class WaveClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    var path = Path();
+    path.lineTo(0, size.height - 50); // Mulai dari bawah
+
+    var firstControlPoint = Offset(size.width / 4, size.height);
+    var firstEndPoint = Offset(size.width / 2.25, size.height - 30);
+    path.quadraticBezierTo(
+      firstControlPoint.dx,
+      firstControlPoint.dy,
+      firstEndPoint.dx,
+      firstEndPoint.dy,
+    );
+
+    var secondControlPoint = Offset(
+      size.width - (size.width / 3.25),
+      size.height - 65,
+    );
+    var secondEndPoint = Offset(size.width, size.height - 40);
+    path.quadraticBezierTo(
+      secondControlPoint.dx,
+      secondControlPoint.dy,
+      secondEndPoint.dx,
+      secondEndPoint.dy,
+    );
+
+    path.lineTo(size.width, 0); // Ke sudut kanan atas
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) {
+    return false;
+  }
+}
+
+// Tambahkan widget holder state di luar State<HomeScreen>
+class _PassengerStatCarouselStateHolder extends InheritedWidget {
+  final PageController controller;
+  final int currentPage;
+  final void Function(int) setCurrentPage;
+  final void Function() startAutoScroll;
+
+  const _PassengerStatCarouselStateHolder({
+    required Widget child,
+    required this.controller,
+    required this.currentPage,
+    required this.setCurrentPage,
+    required this.startAutoScroll,
+  }) : super(child: child);
+
+  static _PassengerStatCarouselStateHolder? of(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<
+          _PassengerStatCarouselStateHolder
+        >();
+  }
+
+  @override
+  bool updateShouldNotify(_PassengerStatCarouselStateHolder oldWidget) {
+    return currentPage != oldWidget.currentPage;
+  }
+}
+
+class _PassengerStatCarouselWrapper extends StatefulWidget {
+  final Widget child;
+  const _PassengerStatCarouselWrapper({required this.child});
+
+  @override
+  State<_PassengerStatCarouselWrapper> createState() =>
+      _PassengerStatCarouselWrapperState();
+}
+
+class _PassengerStatCarouselWrapperState
+    extends State<_PassengerStatCarouselWrapper> {
+  late final PageController _controller;
+  int _currentPage = 0;
+  Timer? _autoScrollTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController(viewportFraction: 0.88);
+    _startAutoScroll();
+  }
+
+  void _startAutoScroll() {
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (_controller.hasClients) {
+        int nextPage = (_currentPage + 1) % 4; // 4 = jumlah card
+        _controller.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+        setState(() {
+          _currentPage = nextPage;
+        });
+      }
+    });
+  }
+
+  void _setCurrentPage(int idx) {
+    setState(() {
+      _currentPage = idx;
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _autoScrollTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _PassengerStatCarouselStateHolder(
+      controller: _controller,
+      currentPage: _currentPage,
+      setCurrentPage: _setCurrentPage,
+      startAutoScroll: _startAutoScroll,
+      child: widget.child,
     );
   }
 }

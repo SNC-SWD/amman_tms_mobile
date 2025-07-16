@@ -17,11 +17,10 @@ class FleetService {
   }
 
   Future<String?> _getSessionId() async {
-    // Get sessionId from AuthService's local storage
     await _authService.initializeSession();
     _sessionId = _authService.sessionId;
     print(
-      '🔑 [FleetService] Retrieved sessionId from storage: ${_sessionId != null ? 'Found' : 'Not found'}',
+      '🔑 [RouteService] Retrieved sessionId from storage: ${_sessionId != null ? 'Found' : 'Not found'}',
     );
     return _sessionId;
   }
@@ -91,17 +90,19 @@ class FleetService {
         '🚌 [FleetService] Fetching fleets with params: type=$fleetType, name=$fleetName, driver=$driverName, status=$statusName',
       );
 
+      String? sessionId = await _getSessionId();
+
       // Ensure session is valid before making API call
-      final reAuthSuccess = await _reAuthenticate();
-      if (!reAuthSuccess) {
-        print(
-          '❌ [FleetService] Re-authentication failed, cannot proceed with request',
-        );
-        return {
-          'status': false,
-          'message': 'Authentication failed. Please login again.',
-        };
-      }
+      // final reAuthSuccess = await _reAuthenticate();
+      // if (!reAuthSuccess) {
+      //   print(
+      //     '❌ [FleetService] Re-authentication failed, cannot proceed with request',
+      //   );
+      //   return {
+      //     'status': false,
+      //     'message': 'Authentication failed. Please login again.',
+      //   };
+      // }
 
       final Uri uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.getFleets}')
           .replace(
@@ -120,7 +121,7 @@ class FleetService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Cookie': 'session_id=$_sessionId',
+          'Cookie': 'session_id=$sessionId',
         },
       );
 
@@ -180,22 +181,99 @@ class FleetService {
     }
   }
 
-  Future<Map<String, dynamic>> getMyAssignedBus(String driverId) async {
+  Future<Map<String, dynamic>> getFleetsWithPagination() async {
     try {
-      print('🚌 [FleetService] Fetching assigned bus for driver: $driverId');
+      print('🚌 [FleetService] Fetching fleets with pagination');
 
-      // Ensure session is valid before making API call
-      final reAuthSuccess = await _reAuthenticate();
-      if (!reAuthSuccess) {
+      String? sessionId = await _getSessionId();
+
+      final Uri uri = Uri.parse(
+        '${ApiConfig.baseUrl}${ApiConfig.getFleetsPagination}',
+      );
+
+      print('🌐 [FleetService] Making request to: ${uri.toString()}');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Cookie': 'session_id=$sessionId',
+        },
+      );
+
+      print('📡 [FleetService] Response status: ${response.statusCode}');
+
+      if (response.statusCode == 404) {
         print(
-          '❌ [FleetService] Re-authentication failed, cannot proceed with request',
+          '⚠️ [FleetService] Not Found (404), attempting re-authentication',
         );
+        final reAuthSuccess = await _reAuthenticate();
+        if (reAuthSuccess) {
+          print(
+            '🔄 [FleetService] Re-authentication successful, retrying request',
+          );
+          final retryResponse = await http.get(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Cookie': 'session_id=$_sessionId',
+            },
+          );
+
+          print(
+            '📡 [FleetService] Retry response status: ${retryResponse.statusCode}',
+          );
+
+          if (retryResponse.statusCode == 200) {
+            print('✅ [FleetService] Retry successful, returning data');
+            return jsonDecode(retryResponse.body);
+          }
+        }
+        print('❌ [FleetService] Retry failed, returning error');
         return {
           'status': false,
           'message': 'Authentication failed. Please login again.',
         };
       }
-      final String? sessionId = _sessionId;
+
+      if (response.statusCode == 200) {
+        print('✅ [FleetService] Request successful, returning data');
+        return jsonDecode(response.body);
+      } else {
+        print(
+          '❌ [FleetService] Request failed with status: ${response.statusCode}',
+        );
+        return {
+          'status': false,
+          'message': 'Failed to fetch fleets. Status: ${response.statusCode}',
+        };
+      }
+    } catch (e) {
+      print('❌ [FleetService] Network error: $e');
+      return {'status': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> getMyAssignedBus(String driverId) async {
+    try {
+      print('🚌 [FleetService] Fetching assigned bus for driver: $driverId');
+
+      String? sessionId = await _getSessionId();
+
+      // Ensure session is valid before making API call
+      // final reAuthSuccess = await _reAuthenticate();
+      // if (!reAuthSuccess) {
+      //   print(
+      //     '❌ [FleetService] Re-authentication failed, cannot proceed with request',
+      //   );
+      //   return {
+      //     'status': false,
+      //     'message': 'Authentication failed. Please login again.',
+      //   };
+      // }
+      // final String? sessionId = _sessionId;
 
       final Uri uri = Uri.parse(
         '${ApiConfig.baseUrl}${ApiConfig.getFleets}',
@@ -277,18 +355,22 @@ class FleetService {
       print(
         '🚦 [FleetService] Updating vehicle status for busId: $busId to statusSeq: $statusSeq',
       );
+
+      String? sessionId = await _getSessionId();
+
       // Ensure session is valid before making API call
-      final reAuthSuccess = await _reAuthenticate();
-      if (!reAuthSuccess) {
-        print(
-          '❌ [FleetService] Re-authentication failed, cannot proceed with request',
-        );
-        return {
-          'status': false,
-          'message': 'Authentication failed. Please login again.',
-        };
-      }
-      final String? sessionId = _sessionId;
+      // final reAuthSuccess = await _reAuthenticate();
+      // if (!reAuthSuccess) {
+      //   print(
+      //     '❌ [FleetService] Re-authentication failed, cannot proceed with request',
+      //   );
+      //   return {
+      //     'status': false,
+      //     'message': 'Authentication failed. Please login again.',
+      //   };
+      // }
+      // final String? sessionId = _sessionId;
+
       final Uri uri = Uri.parse('${ApiConfig.baseUrl}/vehicle/$busId/status');
       print('🌐 [FleetService] Making PATCH request to: ${uri.toString()}');
       final response = await http.patch(
@@ -362,6 +444,96 @@ class FleetService {
           'status': false,
           'message':
               'Failed to update vehicle status. Status: ${response.statusCode}',
+        };
+      }
+    } catch (e) {
+      print('❌ [FleetService] Network error: $e');
+      return {'status': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  // Method baru untuk mencari bus
+  Future<Map<String, dynamic>> searchBuses({
+    required String date,
+    required int fromLocationId,
+    required int toLocationId,
+  }) async {
+    try {
+      print(
+        '🔍 [FleetService] Searching buses for date: $date, from: $fromLocationId, to: $toLocationId',
+      );
+
+      String? sessionId = await _getSessionId();
+      final Uri uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.searchBus}');
+      final payload = jsonEncode({
+        "date": date,
+        "from_location_id": fromLocationId,
+        "to_location_id": toLocationId,
+      });
+
+      print('🌐 [FleetService] Making POST request to: ${uri.toString()}');
+      print('📦 [FleetService] Payload: $payload');
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Cookie': 'session_id=$sessionId',
+        },
+        body: payload,
+      );
+
+      print('📡 [FleetService] Response status: ${response.statusCode}');
+
+      if (response.statusCode == 404) {
+        print(
+          '⚠️ [FleetService] Not Found (404), attempting re-authentication',
+        );
+        final reAuthSuccess = await _reAuthenticate();
+        if (reAuthSuccess) {
+          print(
+            '🔄 [FleetService] Re-authentication successful, retrying request',
+          );
+          final retryResponse = await http.post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Cookie': 'session_id=$_sessionId', // Menggunakan session ID baru
+            },
+            body: payload,
+          );
+
+          print(
+            '📡 [FleetService] Retry response status: ${retryResponse.statusCode}',
+          );
+
+          if (retryResponse.statusCode == 200) {
+            print('✅ [FleetService] Retry successful, returning data');
+            return jsonDecode(retryResponse.body);
+          }
+        }
+        print('❌ [FleetService] Retry failed, returning error');
+        return {
+          'status': false,
+          'message': 'Authentication failed. Please login again.',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        print('✅ [FleetService] Request successful, returning data');
+        return jsonDecode(response.body);
+      } else {
+        print(
+          '❌ [FleetService] Request failed with status: ${response.statusCode}',
+        );
+        final errorBody = jsonDecode(response.body);
+        return {
+          'status': false,
+          'message':
+              errorBody['message'] ??
+              'Failed to search buses. Status: ${response.statusCode}',
         };
       }
     } catch (e) {

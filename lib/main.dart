@@ -5,10 +5,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:amman_tms_mobile/screens/authentication/splash_screen.dart';
 import 'package:amman_tms_mobile/screens/home/main_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print('Handling a background message: ${message.messageId}');
+  // TODO: Implement logic to show notification or process data
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   initializeDateFormatting('id_ID', null).then((_) {
     runApp(const MyApp());
   });
@@ -30,6 +43,97 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _loadLoginStatus();
+    _initFirebaseMessaging();
+  }
+
+  void _initFirebaseMessaging() async {
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+    // Initialize flutter_local_notifications
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('notification_icon');
+    const DarwinInitializationSettings initializationSettingsDarwin =
+        DarwinInitializationSettings();
+    const InitializationSettings initializationSettings =
+        InitializationSettings(
+          android: initializationSettingsAndroid,
+          iOS: initializationSettingsDarwin,
+        );
+    await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse:
+          (NotificationResponse notificationResponse) async {
+            // Handle notification tap
+            print('Notification tapped: ${notificationResponse.payload}');
+            // TODO: Navigate to specific screen based on payload
+          },
+    );
+
+    // Request permission for notifications
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
+
+    print('User granted permission: ${settings.authorizationStatus}');
+
+    // Handle foreground messages
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      print('Got a message whilst in the foreground!');
+      print('Message data: ${message.data}');
+
+      if (message.notification != null) {
+        print('Message also contained a notification: ${message.notification}');
+        _showNotification(message);
+      }
+    });
+
+    // Handle interaction when app is in background but not terminated
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      print('A new onMessageOpenedApp event was published!');
+      // TODO: Navigate to specific screen based on notification data
+    });
+
+    // Handle initial message when app is opened from terminated state
+    RemoteMessage? initialMessage = await FirebaseMessaging.instance
+        .getInitialMessage();
+    if (initialMessage != null) {
+      print(
+        'App opened from terminated state by notification: ${initialMessage.notification}',
+      );
+      // TODO: Navigate to specific screen based on initialMessage data
+    }
+  }
+
+  Future<void> _showNotification(RemoteMessage message) async {
+    AndroidNotificationDetails
+    androidPlatformChannelSpecifics = const AndroidNotificationDetails(
+      'high_importance_channel', // id
+      'High Importance Notifications', // title
+      channelDescription:
+          'This channel is used for important notifications.', // description
+      importance: Importance.max,
+      priority: Priority.high,
+      ticker: 'ticker',
+    );
+    DarwinNotificationDetails darwinPlatformChannelSpecifics =
+        const DarwinNotificationDetails();
+    NotificationDetails platformChannelSpecifics = NotificationDetails(
+      android: androidPlatformChannelSpecifics,
+      iOS: darwinPlatformChannelSpecifics,
+    );
+    await flutterLocalNotificationsPlugin.show(
+      0,
+      message.notification?.title,
+      message.notification?.body,
+      platformChannelSpecifics,
+      payload: 'item x',
+    );
   }
 
   Future<void> _loadLoginStatus() async {
@@ -120,8 +224,20 @@ class _MyAppState extends State<MyApp> {
             fontWeight: FontWeight.bold,
             fontSize: 22,
             color: Color(0xFF163458),
+            fontFamily: 'Poppins',
           ),
-          bodyMedium: TextStyle(fontSize: 16, color: Color(0xFF4C5C74)),
+          bodyMedium: TextStyle(
+            fontSize: 16,
+            color: Color(0xFF4C5C74),
+            fontFamily: 'Poppins',
+          ),
+          titleMedium: TextStyle(fontFamily: 'Poppins'),
+          titleSmall: TextStyle(fontFamily: 'Poppins'),
+          bodyLarge: TextStyle(fontFamily: 'Poppins'),
+          bodySmall: TextStyle(fontFamily: 'Poppins'),
+          labelLarge: TextStyle(fontFamily: 'Poppins'),
+          labelMedium: TextStyle(fontFamily: 'Poppins'),
+          labelSmall: TextStyle(fontFamily: 'Poppins'),
         ),
       ),
       home: _showSplash

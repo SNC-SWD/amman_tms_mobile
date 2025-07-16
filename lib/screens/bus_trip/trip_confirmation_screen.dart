@@ -9,12 +9,12 @@ import 'package:intl/intl.dart';
 // trip: data trip dari card Trip to Confirm
 // Desain modern, trendy, dan eye catching.
 //
-// Author: AI Assistant
+// Author: AI Assistant (Revamped by Gemini, using local fonts)
 
 class TripConfirmationScreen extends StatefulWidget {
   final BusTrip? trip;
 
-  const TripConfirmationScreen({Key? key, this.trip}) : super(key: key);
+  const TripConfirmationScreen({super.key, this.trip});
 
   @override
   State<TripConfirmationScreen> createState() => _TripConfirmationScreenState();
@@ -25,7 +25,6 @@ class _TripConfirmationScreenState extends State<TripConfirmationScreen> {
   int passengerQuantity = 1;
   bool isLoading = false;
   String? errorMessage;
-  String? successMessage;
   final TextEditingController _controller = TextEditingController(text: '1');
   DateTime? filterStartDate;
   DateTime? filterEndDate;
@@ -51,37 +50,36 @@ class _TripConfirmationScreenState extends State<TripConfirmationScreen> {
     setState(() {
       passengerQuantity = value < 1 ? 1 : value;
       _controller.text = passengerQuantity.toString();
+      _controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: _controller.text.length),
+      );
     });
   }
 
   Future<void> _submit() async {
+    if (isLoading || selectedTrip == null) return;
+
     setState(() {
       isLoading = true;
       errorMessage = null;
-      successMessage = null;
     });
 
     try {
-      // Step 1: Call getPlanTrips with trip_date, user_id, route_id
       final planTripResult = await BusTripService().getPlanTrips(
-        tripDate: selectedTrip?.tripDate ?? '',
-        userId: selectedTrip?.userId.toString() ?? '',
-        routeId: selectedTrip?.routeId.toString() ?? '',
+        tripDate: selectedTrip!.tripDate ?? '',
+        userId: selectedTrip!.userId.toString(),
+        routeId: selectedTrip!.routeId.toString(),
       );
+
       if (planTripResult['status'] != true ||
           planTripResult['data'] == null ||
           planTripResult['data'].isEmpty) {
-        setState(() {
-          errorMessage =
-              planTripResult['message'] ??
-              'No plan trip found for confirmation.';
-        });
-        return;
+        throw planTripResult['message'] ??
+            'No plan trip found for confirmation.';
       }
-      final planTripData = planTripResult['data'];
-      final searchResultId = planTripData[0]['id'].toString();
 
-      // Step 2: Call checkoutBusTrip with search_result_id and passenger_quantity
+      final searchResultId = planTripResult['data'][0]['id'].toString();
+
       final checkoutResult = await BusTripService().checkoutBusTrip(
         searchResultId: searchResultId,
         passengerQuantity: passengerQuantity,
@@ -90,85 +88,31 @@ class _TripConfirmationScreenState extends State<TripConfirmationScreen> {
       if (checkoutResult['status'] == true) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      checkoutResult['message'] ?? 'Confirmation sukses',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
+            _buildStatusSnackBar(
+              message: checkoutResult['message'] ?? 'Confirmation success',
+              icon: Icons.check_circle_outline_rounded,
+              color: const Color(0xFF00A99D),
             ),
           );
-          Future.delayed(const Duration(seconds: 1), () {
-            Navigator.of(context).pop(true);
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              Navigator.of(context).pop(true);
+            }
           });
         }
       } else {
-        setState(() {
-          errorMessage = checkoutResult['message'] ?? 'Failed to confirm trip';
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      checkoutResult['message'] ?? 'Failed to confirm trip',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          );
-        }
+        throw checkoutResult['message'] ?? 'Failed to confirm trip';
       }
     } catch (e) {
-      setState(() {
-        errorMessage = 'Error during confirmation: $e';
-      });
       if (mounted) {
+        setState(() {
+          errorMessage = e.toString();
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Error during confirmation: $e',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+          _buildStatusSnackBar(
+            message: errorMessage!,
+            icon: Icons.error_outline_rounded,
+            color: const Color(0xFFD9534F),
           ),
         );
       }
@@ -181,208 +125,238 @@ class _TripConfirmationScreenState extends State<TripConfirmationScreen> {
     }
   }
 
+  SnackBar _buildStatusSnackBar({
+    required String message,
+    required IconData icon,
+    required Color color,
+  }) {
+    return SnackBar(
+      content: Row(
+        children: [
+          Icon(icon, color: Colors.white),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+      backgroundColor: color,
+      duration: const Duration(seconds: 3),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+    );
+  }
+
   Future<void> _openTripSelectorDialog() async {
     setState(() {
       isFetchingTrips = true;
     });
-    final userId = await AuthService().getUserId();
-    final startDate = filterStartDate != null
-        ? DateFormat('yyyy-MM-dd').format(filterStartDate!)
-        : null;
-    final endDate = filterEndDate != null
-        ? DateFormat('yyyy-MM-dd').format(filterEndDate!)
-        : null;
-    final result = await BusTripService().getBusTrips(
-      userId: userId ?? '',
-      startDate: startDate,
-      endDate: endDate,
-    );
-    setState(() {
-      isFetchingTrips = false;
-    });
-    if (result['status'] == true && result['data'] != null) {
-      List<BusTrip> trips = (result['data'] as List)
-          .map((e) => BusTrip.fromJson(e))
-          .toList();
-      // Filter bus_state_seq > 0
-      trips = trips.where((t) => (t.statusSeq ?? 0) > 0).toList();
-      if (searchQuery.isNotEmpty) {
-        trips = trips
-            .where(
-              (t) =>
-                  (t.busPlate?.toLowerCase().contains(
-                        searchQuery.toLowerCase(),
-                      ) ??
-                      false) ||
-                  (t.boardingPointName?.toLowerCase().contains(
-                        searchQuery.toLowerCase(),
-                      ) ??
-                      false) ||
-                  (t.dropPointName?.toLowerCase().contains(
-                        searchQuery.toLowerCase(),
-                      ) ??
-                      false),
-            )
+
+    try {
+      final userId = await AuthService().getUserId();
+      final result = await BusTripService().getBusTrips(
+        userId: userId ?? '',
+        startDate: filterStartDate != null
+            ? DateFormat('yyyy-MM-dd').format(filterStartDate!)
+            : null,
+        endDate: filterEndDate != null
+            ? DateFormat('yyyy-MM-dd').format(filterEndDate!)
+            : null,
+      );
+
+      if (result['status'] == true && result['data'] != null) {
+        List<BusTrip> fetchedTrips = (result['data'] as List)
+            .map((e) => BusTrip.fromJson(e))
+            .where((t) => (t.statusSeq ?? 0) > 0)
             .toList();
-      }
-      setState(() {
-        availableTrips = trips;
-      });
-      await showDialog(
-        context: context,
-        builder: (ctx) {
-          return StatefulBuilder(
-            builder: (ctx, setStateDialog) {
-              return AlertDialog(
-                title: const Text('Pilih Bus Trip'),
-                content: SizedBox(
-                  width: double.maxFinite,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              decoration: const InputDecoration(
-                                hintText: 'Cari bus, rute, atau plat',
-                                prefixIcon: Icon(Icons.search_rounded),
-                              ),
-                              onChanged: (val) {
-                                setStateDialog(() {
-                                  searchQuery = val;
-                                  availableTrips = trips
-                                      .where(
-                                        (t) =>
-                                            (t.busPlate?.toLowerCase().contains(
-                                                  val.toLowerCase(),
-                                                ) ??
-                                                false) ||
-                                            (t.boardingPointName
-                                                    ?.toLowerCase()
-                                                    .contains(
-                                                      val.toLowerCase(),
-                                                    ) ??
-                                                false) ||
-                                            (t.dropPointName
-                                                    ?.toLowerCase()
-                                                    .contains(
-                                                      val.toLowerCase(),
-                                                    ) ??
-                                                false),
-                                      )
-                                      .toList();
-                                });
-                              },
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.filter_alt_rounded),
-                            onPressed: () async {
-                              final pickedStart = await showDatePicker(
-                                context: ctx,
-                                initialDate: filterStartDate ?? DateTime.now(),
-                                firstDate: DateTime(2023),
-                                lastDate: DateTime(2100),
-                              );
-                              if (pickedStart != null) {
-                                setStateDialog(() {
-                                  filterStartDate = pickedStart;
-                                });
-                              }
-                              final pickedEnd = await showDatePicker(
-                                context: ctx,
-                                initialDate: filterEndDate ?? DateTime.now(),
-                                firstDate: DateTime(2023),
-                                lastDate: DateTime(2100),
-                              );
-                              if (pickedEnd != null) {
-                                setStateDialog(() {
-                                  filterEndDate = pickedEnd;
-                                });
-                              }
-                              Navigator.of(ctx).pop();
-                              _openTripSelectorDialog();
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      if (isFetchingTrips)
-                        const Center(child: CircularProgressIndicator()),
-                      if (!isFetchingTrips && availableTrips.isEmpty)
-                        const Text('Tidak ada trip ditemukan.'),
-                      if (!isFetchingTrips)
-                        Expanded(
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: availableTrips.length,
-                            itemBuilder: (ctx, idx) {
-                              final trip = availableTrips[idx];
-                              return Card(
-                                margin: const EdgeInsets.symmetric(vertical: 6),
-                                child: ListTile(
-                                  leading: const Icon(
-                                    Icons.directions_bus_rounded,
-                                    color: Colors.amber,
-                                  ),
-                                  title: Text(
-                                    '${trip.boardingPointName} → ${trip.dropPointName}',
-                                  ),
-                                  subtitle: Text(
-                                    '${trip.busFleetType} (${trip.busPlate})',
-                                  ),
-                                  trailing: Text(
-                                    DateFormat('dd MMM yyyy').format(
-                                      DateTime.parse(trip.tripDate ?? ''),
-                                    ),
-                                  ),
-                                  onTap: () {
-                                    setState(() {
-                                      selectedTrip = trip;
-                                    });
-                                    Navigator.of(ctx).pop();
-                                  },
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: const Text('Tutup'),
-                  ),
-                ],
-              );
-            },
+
+        setState(() {
+          availableTrips = fetchedTrips;
+          isFetchingTrips = false;
+        });
+
+        if (mounted) {
+          await showDialog(
+            context: context,
+            builder: (ctx) => _buildTripSelectorDialog(ctx, fetchedTrips),
           );
-        },
-      );
-    } else {
-      setState(() {
-        availableTrips = [];
-      });
-      showDialog(
-        context: context,
-        builder: (ctx) => const AlertDialog(
-          title: Text('Error'),
-          content: Text('Gagal mengambil data trip.'),
-        ),
-      );
+        }
+      } else {
+        throw 'Failed to get trip data.';
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          _buildStatusSnackBar(
+            message: e.toString(),
+            icon: Icons.error_outline_rounded,
+            color: const Color(0xFFD9534F),
+          ),
+        );
+        setState(() {
+          isFetchingTrips = false;
+        });
+      }
     }
   }
 
+  Widget _buildTripSelectorDialog(
+    BuildContext context,
+    List<BusTrip> initialTrips,
+  ) {
+    return StatefulBuilder(
+      builder: (ctx, setStateDialog) {
+        final filteredTrips = initialTrips.where((t) {
+          final query = searchQuery.toLowerCase();
+          return (t.busPlate?.toLowerCase().contains(query) ?? false) ||
+              (t.boardingPointName?.toLowerCase().contains(query) ?? false) ||
+              (t.dropPointName?.toLowerCase().contains(query) ?? false);
+        }).toList();
+
+        return AlertDialog(
+          backgroundColor: const Color(0xFFF8F9FD),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            'Select a Trip',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1A2A4A),
+            ),
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Search by bus, route, or plate',
+                    hintStyle: const TextStyle(
+                      fontFamily: 'Poppins',
+                      color: Colors.grey,
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.search,
+                      color: Color(0xFF1A2A4A),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 0,
+                      horizontal: 16,
+                    ),
+                  ),
+                  onChanged: (val) => setStateDialog(() => searchQuery = val),
+                ),
+                const SizedBox(height: 16),
+                if (isFetchingTrips)
+                  const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF00A99D)),
+                  )
+                else if (filteredTrips.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Text(
+                      'No trips found.',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: filteredTrips.length,
+                      itemBuilder: (ctx, idx) {
+                        final trip = filteredTrips[idx];
+                        return Card(
+                          elevation: 2,
+                          margin: const EdgeInsets.symmetric(vertical: 5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          color: Colors.white,
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: const Color(
+                                0xFF00A99D,
+                              ).withOpacity(0.1),
+                              child: const Icon(
+                                Icons.directions_bus_filled_rounded,
+                                color: Color(0xFF00A99D),
+                              ),
+                            ),
+                            title: Text(
+                              '${trip.boardingPointName} → ${trip.dropPointName}',
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${trip.busFleetType} (${trip.busPlate}) - ${_formatTripDate(trip.tripDate)}',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            onTap: () {
+                              setState(() => selectedTrip = trip);
+                              Navigator.of(ctx).pop();
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text(
+                'Close',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A2A4A),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   String _formatTripDate(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return 'N/A';
     try {
-      if (dateStr == null || dateStr.isEmpty) return '';
       final date = DateTime.parse(dateStr);
-      return DateFormat('dd MMM yyyy').format(date);
+      return DateFormat('d MMM yyyy').format(date);
     } catch (_) {
-      return dateStr ?? '';
+      return dateStr;
     }
   }
 
@@ -390,31 +364,30 @@ class _TripConfirmationScreenState extends State<TripConfirmationScreen> {
     required IconData icon,
     required String label,
     required String value,
-    Color? iconColor,
-    Color? valueColor,
+    required Color color,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: iconColor ?? Colors.blueGrey[400]),
-          const SizedBox(width: 8),
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 12),
           Text(
             label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF163458),
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 13,
+              color: Colors.grey[600],
             ),
           ),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: valueColor ?? Colors.black87,
-                fontWeight: FontWeight.w500,
-              ),
-              overflow: TextOverflow.ellipsis,
+          const Spacer(),
+          Text(
+            value,
+            style: const TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1A2A4A),
             ),
           ),
         ],
@@ -424,271 +397,322 @@ class _TripConfirmationScreenState extends State<TripConfirmationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final p = selectedTrip;
     return Scaffold(
+      backgroundColor: const Color(0xFFF3F6FA),
       appBar: AppBar(
-        title: const Text('Add Passenger'),
-        backgroundColor: const Color(0xFF163458),
-        foregroundColor: Colors.white,
+        title: const Text(
+          'Confirm Your Trip',
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        backgroundColor: const Color(0xFFF3F6FA),
+        foregroundColor: const Color(0xFF1A2A4A),
         elevation: 0,
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (p == null) ...[
-              ElevatedButton.icon(
-                icon: const Icon(Icons.directions_bus_rounded),
-                label: const Text('Pilih Trip'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.amber,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: isFetchingTrips ? null : _openTripSelectorDialog,
-              ),
-              const SizedBox(height: 24),
-            ],
-            if (p != null) ...[
-              // Detail Inquiry Section
-              Container(
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.blueGrey.withOpacity(0.10),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE6EDF6),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.all(10),
-                          child: const Icon(
-                            Icons.route,
-                            color: Color(0xFF163458),
-                            size: 26,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            '${p.boardingPointName} → ${p.dropPointName}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 20,
-                              color: Color(0xFF163458),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    _infoRow(
-                      icon: Icons.calendar_today,
-                      label: 'Date',
-                      value: _formatTripDate(p.tripDate),
-                      iconColor: Colors.amber,
-                      valueColor: Colors.amber[800],
-                    ),
-                    _infoRow(
-                      icon: Icons.directions_bus,
-                      label: 'Bus',
-                      value: '${p.busFleetType} (${p.busPlate})',
-                      iconColor: Colors.blue,
-                    ),
-                    _infoRow(
-                      icon: Icons.directions,
-                      label: 'Bus Type',
-                      value: p.busFleetType,
-                      iconColor: Colors.blueGrey,
-                    ),
-                    _infoRow(
-                      icon: Icons.person,
-                      label: 'Driver',
-                      value: p.userIdName,
-                      iconColor: Colors.green,
-                    ),
-                    _infoRow(
-                      icon: Icons.event_seat,
-                      label: 'Total Seats',
-                      value: p.totalSeat.toString(),
-                      iconColor: Colors.deepPurple,
-                    ),
-                    _infoRow(
-                      icon: Icons.chair_alt,
-                      label: 'Passengers',
-                      value: p.seatBooked.toString(),
-                      iconColor: Colors.orange,
-                    ),
-                    _infoRow(
-                      icon: Icons.chair,
-                      label: 'Available',
-                      value: p.remainingSeats.toString(),
-                      iconColor: Colors.teal,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-              // Passenger Quantity Section
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFB),
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.blueGrey.withOpacity(0.06),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Number of Passengers',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                        color: Color(0xFF163458),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.remove_circle,
-                            color: Colors.redAccent,
-                            size: 32,
-                          ),
-                          onPressed: passengerQuantity > 1
-                              ? () => _updatePassengerQuantity(
-                                  passengerQuantity - 1,
-                                )
-                              : null,
-                        ),
-                        SizedBox(
-                          width: 60,
-                          child: TextField(
-                            controller: _controller,
-                            keyboardType: TextInputType.number,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            decoration: InputDecoration(
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 8,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(
-                                  color: Colors.amber,
-                                ),
-                              ),
-                            ),
-                            onChanged: (val) {
-                              final parsed = int.tryParse(val);
-                              if (parsed != null && parsed > 0) {
-                                _updatePassengerQuantity(parsed);
-                              }
-                            },
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.add_circle,
-                            color: Colors.green,
-                            size: 32,
-                          ),
-                          onPressed: () =>
-                              _updatePassengerQuantity(passengerQuantity + 1),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 40),
-              // Submit Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.amber,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    elevation: 6,
-                    shadowColor: Colors.amberAccent.withOpacity(0.3),
-                  ),
-                  onPressed: isLoading ? null : _submit,
-                  child: isLoading
-                      ? const SizedBox(
-                          width: 28,
-                          height: 28,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 3,
-                          ),
-                        )
-                      : const Text('Submit'),
-                ),
-              ),
-              if (errorMessage != null) ...[
-                const SizedBox(height: 18),
-                Text(
-                  errorMessage!,
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-              if (successMessage != null) ...[
-                const SizedBox(height: 18),
-                Text(
-                  successMessage!,
-                  style: const TextStyle(
-                    color: Colors.green,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ],
+            const SizedBox(height: 10),
+            if (selectedTrip == null)
+              ..._buildTripSelector()
+            else
+              ..._buildTripDetails(selectedTrip!),
+            const SizedBox(height: 40),
           ],
         ),
       ),
-      backgroundColor: const Color(0xFFF3F6FA),
+      bottomNavigationBar: _buildBottomBar(),
+    );
+  }
+
+  List<Widget> _buildTripSelector() {
+    return [
+      Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 80),
+            Icon(Icons.search_off_rounded, size: 80, color: Colors.grey[300]),
+            const SizedBox(height: 20),
+            Text(
+              'No Trip Selected',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Please select a trip to continue.',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.directions_bus_rounded, size: 18),
+              label: const Text(
+                'Select a Trip',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00A99D),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 40,
+                  vertical: 15,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                elevation: 5,
+                shadowColor: const Color(0xFF00A99D).withOpacity(0.4),
+              ),
+              onPressed: isFetchingTrips ? null : _openTripSelectorDialog,
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _buildTripDetails(BusTrip p) {
+    return [
+      // Trip Details Card
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.08),
+              blurRadius: 30,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: _openTripSelectorDialog,
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: const Color(0xFF1A2A4A).withOpacity(0.1),
+                    child: const Icon(
+                      Icons.route_rounded,
+                      color: Color(0xFF1A2A4A),
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${p.boardingPointName}',
+                          style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Color(0xFF1A2A4A),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          '→ ${p.dropPointName}',
+                          style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Color(0xFF1A2A4A),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.edit_note_rounded, color: Color(0xFF00A99D)),
+                ],
+              ),
+            ),
+            const Divider(height: 30, thickness: 1, color: Color(0xFFF3F6FA)),
+            _infoRow(
+              icon: Icons.calendar_today_rounded,
+              label: 'Date',
+              value: _formatTripDate(p.tripDate),
+              color: const Color(0xFF00A99D),
+            ),
+            _infoRow(
+              icon: Icons.directions_bus_rounded,
+              label: 'Bus',
+              value: '${p.busFleetType} (${p.busPlate})',
+              color: const Color(0xFF4A90E2),
+            ),
+            _infoRow(
+              icon: Icons.person_rounded,
+              label: 'Driver',
+              value: p.userIdName ?? 'N/A',
+              color: const Color(0xFF50E3C2),
+            ),
+            _infoRow(
+              icon: Icons.chair_rounded,
+              label: 'Available Seats',
+              value: p.remainingSeats.toString(),
+              color: const Color(0xFFFFAB76),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 24),
+      // Passenger Quantity Section
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Passengers',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Color(0xFF1A2A4A),
+              ),
+            ),
+            Row(
+              children: [
+                _buildQuantityButton(
+                  icon: Icons.remove,
+                  onPressed: passengerQuantity > 1
+                      ? () => _updatePassengerQuantity(passengerQuantity - 1)
+                      : null,
+                ),
+                SizedBox(
+                  width: 50,
+                  child: TextField(
+                    controller: _controller,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    decoration: const InputDecoration(border: InputBorder.none),
+                    onChanged: (val) {
+                      final parsed = int.tryParse(val);
+                      if (parsed != null && parsed >= 1) {
+                        _updatePassengerQuantity(parsed);
+                      }
+                    },
+                  ),
+                ),
+                _buildQuantityButton(
+                  icon: Icons.add,
+                  onPressed: () =>
+                      _updatePassengerQuantity(passengerQuantity + 1),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  Widget _buildQuantityButton({
+    required IconData icon,
+    VoidCallback? onPressed,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F6FA),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: const Color(0xFF1A2A4A)),
+        onPressed: onPressed,
+        disabledColor: Colors.grey[300],
+        splashRadius: 20,
+      ),
+    );
+  }
+
+  Widget _buildBottomBar() {
+    if (selectedTrip == null) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 30),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(30),
+          topRight: Radius.circular(30),
+        ),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            backgroundColor: const Color(0xFF1A2A4A),
+            foregroundColor: Colors.white,
+            elevation: 8,
+            shadowColor: const Color(0xFF1A2A4A).withOpacity(0.4),
+          ),
+          onPressed: isLoading ? null : _submit,
+          child: isLoading
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 3,
+                  ),
+                )
+              : const Text(
+                  'Confirm',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+        ),
+      ),
     );
   }
 }

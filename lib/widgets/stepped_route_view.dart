@@ -80,6 +80,7 @@ class SteppedRouteView extends StatelessWidget {
                               fontSize: 14, // MODIFIED
                               fontWeight: FontWeight.bold,
                               color: kPrimaryBlue,
+                              fontFamily: 'Poppins',
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -171,6 +172,7 @@ class SteppedRouteView extends StatelessWidget {
               color: kSlateGray,
               fontSize: 12, // MODIFIED
               fontWeight: FontWeight.w500,
+              fontFamily: 'Poppins',
             ),
           ),
         ),
@@ -181,6 +183,7 @@ class SteppedRouteView extends StatelessWidget {
               color: isRoute ? iconColor : kPrimaryBlue,
               fontSize: 12, // MODIFIED
               fontWeight: FontWeight.w600,
+              fontFamily: 'Poppins',
             ),
             overflow: TextOverflow.ellipsis,
           ),

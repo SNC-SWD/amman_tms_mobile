@@ -20,7 +20,7 @@ class BusPointService {
     await _authService.initializeSession();
     _sessionId = _authService.sessionId;
     print(
-      '🔑 [BusPointService] Retrieved sessionId from storage: ${_sessionId != null ? 'Found' : 'Not found'}',
+      '🔑 [RouteService] Retrieved sessionId from storage: ${_sessionId != null ? 'Found' : 'Not found'}',
     );
     return _sessionId;
   }
@@ -82,18 +82,20 @@ class BusPointService {
     try {
       print('📍 [BusPointService] Fetching bus points');
 
+      String? sessionId = await _getSessionId();
+
       // Ensure session is valid before making API call
-      final reAuthSuccess = await _reAuthenticate();
-      if (!reAuthSuccess) {
-        print(
-          '❌ [BusPointService] Re-authentication failed, cannot proceed with request',
-        );
-        return {
-          'status': false,
-          'message': 'Authentication failed. Please login again.',
-        };
-      }
-      String? sessionId = _sessionId;
+      // final reAuthSuccess = await _reAuthenticate();
+      // if (!reAuthSuccess) {
+      //   print(
+      //     '❌ [BusPointService] Re-authentication failed, cannot proceed with request',
+      //   );
+      //   return {
+      //     'status': false,
+      //     'message': 'Authentication failed. Please login again.',
+      //   };
+      // }
+      // String? sessionId = _sessionId;
 
       final Uri uri = Uri.parse(
         '${ApiConfig.baseUrl}${ApiConfig.getBusPoints}',
@@ -106,7 +108,7 @@ class BusPointService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Cookie': 'session_id=$_sessionId',
+          'Cookie': 'session_id=$sessionId',
         },
       );
 

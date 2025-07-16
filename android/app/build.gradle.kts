@@ -22,6 +22,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -54,6 +55,10 @@ android {
             isMinifyEnabled = false
             isShrinkResources = false
         }
+        getByName("debug") {
+            // Menggunakan signing config release untuk debug juga
+            signingConfig = signingConfigs.getByName("release")
+        }
     }
 }
 
@@ -62,6 +67,7 @@ flutter {
 }
 
 dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
     implementation("com.google.firebase:firebase-analytics")
 }

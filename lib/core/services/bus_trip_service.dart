@@ -20,7 +20,7 @@ class BusTripService {
     await _authService.initializeSession();
     _sessionId = _authService.sessionId;
     print(
-      '🔑 [BusTripService] Retrieved sessionId from storage: ${_sessionId != null ? 'Found' : 'Not found'}',
+      '🔑 [RouteService] Retrieved sessionId from storage: ${_sessionId != null ? 'Found' : 'Not found'}',
     );
     return _sessionId;
   }
@@ -91,34 +91,17 @@ class BusTripService {
       String? sessionId = await _getSessionId();
 
       // direct reAuthenticate
-      final reAuthSuccess = await _reAuthenticate();
-      if (!reAuthSuccess) {
-        print(
-          '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
-        );
-        return {
-          'status': false,
-          'message': 'Authentication failed. Please login again.',
-        };
-      }
-      sessionId = _sessionId;
-
-      // if (sessionId == null) {
+      // final reAuthSuccess = await _reAuthenticate();
+      // if (!reAuthSuccess) {
       //   print(
-      //     '⚠️ [BusTripService] No sessionId found, attempting re-authentication',
+      //     '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
       //   );
-      //   final reAuthSuccess = await _reAuthenticate();
-      //   if (!reAuthSuccess) {
-      //     print(
-      //       '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
-      //     );
-      //     return {
-      //       'status': false,
-      //       'message': 'Authentication failed. Please login again.',
-      //     };
-      //   }
-      //   sessionId = _sessionId;
+      //   return {
+      //     'status': false,
+      //     'message': 'Authentication failed. Please login again.',
+      //   };
       // }
+      // sessionId = _sessionId;
 
       final Map<String, String> queryParams = {};
       if (busId != null && busId.isNotEmpty) queryParams['bus_id'] = busId;
@@ -138,7 +121,7 @@ class BusTripService {
       } else {
         uri = Uri.parse('${ApiConfig.baseUrl}/bus-trip/list');
       }
-  
+
       print(
         '🌐 [BusTripService] Making request to: [32m[1m[4m${uri.toString()}[0m',
       );
@@ -203,7 +186,11 @@ class BusTripService {
       }
     } catch (e) {
       print('❌ [BusTripService] Network error: $e');
-      return {'status': false, 'message': 'Network error: $e'};
+      return {
+        'status': false,
+        'message':
+            'Tidak dapat terhubung ke server. Silakan periksa koneksi internet Anda dan coba lagi.',
+      };
     }
   }
 
@@ -226,35 +213,17 @@ class BusTripService {
       String? sessionId = await _getSessionId();
 
       // direct reAuthenticate
-      final reAuthSuccess = await _reAuthenticate();
-      if (!reAuthSuccess) {
-        print(
-          '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
-        );
-        return {
-          'status': false,
-          'message': 'Authentication failed. Please login again.',
-        };
-      }
-      sessionId = _sessionId;
-
-      // If no sessionId, try to re-authenticate
-      // if (sessionId == null) {
+      // final reAuthSuccess = await _reAuthenticate();
+      // if (!reAuthSuccess) {
       //   print(
-      //     '⚠️ [BusTripService] No sessionId found, attempting re-authentication',
+      //     '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
       //   );
-      //   final reAuthSuccess = await _reAuthenticate();
-      //   if (!reAuthSuccess) {
-      //     print(
-      //       '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
-      //     );
-      //     return {
-      //       'status': false,
-      //       'message': 'Authentication failed. Please login again.',
-      //     };
-      //   }
-      //   sessionId = _sessionId;
+      //   return {
+      //     'status': false,
+      //     'message': 'Authentication failed. Please login again.',
+      //   };
       // }
+      // sessionId = _sessionId;
 
       // Step 1: Call /bus/wizard
       final wizardUri = Uri.parse('${ApiConfig.baseUrl}/bus/wizard');
@@ -329,7 +298,11 @@ class BusTripService {
       }
     } catch (e) {
       print('❌ [BusTripService] Error creating bus trip: $e');
-      return {'status': false, 'message': 'Error creating bus trip: $e'};
+      return {
+        'status': false,
+        'message':
+            'Tidak dapat terhubung ke server. Silakan periksa koneksi internet Anda dan coba lagi.',
+      };
     }
   }
 
@@ -343,22 +316,23 @@ class BusTripService {
       print('👥 Passengers: $passengerQuantity');
 
       String? sessionId = await _getSessionId();
-      if (sessionId == null) {
-        print(
-          '⚠️ [BusTripService] No sessionId found, attempting re-authentication',
-        );
-        final reAuthSuccess = await _reAuthenticate();
-        if (!reAuthSuccess) {
-          print(
-            '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
-          );
-          return {
-            'status': false,
-            'message': 'Authentication failed. Please login again.',
-          };
-        }
-        sessionId = _sessionId;
-      }
+
+      // if (sessionId == null) {
+      //   print(
+      //     '⚠️ [BusTripService] No sessionId found, attempting re-authentication',
+      //   );
+      //   final reAuthSuccess = await _reAuthenticate();
+      //   if (!reAuthSuccess) {
+      //     print(
+      //       '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
+      //     );
+      //     return {
+      //       'status': false,
+      //       'message': 'Authentication failed. Please login again.',
+      //     };
+      //   }
+      //   sessionId = _sessionId;
+      // }
 
       final checkoutUri = Uri.parse('${ApiConfig.baseUrl}/booking/checkout');
       print('🌐 [BusTripService] Making request to: ${checkoutUri.toString()}');
@@ -388,7 +362,6 @@ class BusTripService {
             'message': 'Authentication failed. Please login again.',
           };
         }
-        sessionId = _sessionId;
 
         // Retry checkout request with new session
         checkoutResponse = await http.post(
@@ -396,7 +369,7 @@ class BusTripService {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Cookie': 'session_id=$sessionId',
+            'Cookie': 'session_id=$_sessionId',
           },
           body: jsonEncode({
             'search_result_id': searchResultId,
@@ -424,7 +397,11 @@ class BusTripService {
       }
     } catch (e) {
       print('❌ [BusTripService] Error during checkout: $e');
-      return {'status': false, 'message': 'Error during checkout: $e'};
+      return {
+        'status': false,
+        'message':
+            'Tidak dapat terhubung ke server. Silakan periksa koneksi internet Anda dan coba lagi.',
+      };
     }
   }
 
@@ -438,22 +415,22 @@ class BusTripService {
         '🚌 [BusTripService] Fetching plan trips for date: $tripDate, userId: $userId, routeId: $routeId',
       );
       String? sessionId = await _getSessionId();
-      if (sessionId == null) {
-        print(
-          '⚠️ [BusTripService] No sessionId found, attempting re-authentication',
-        );
-        final reAuthSuccess = await _reAuthenticate();
-        if (!reAuthSuccess) {
-          print(
-            '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
-          );
-          return {
-            'status': false,
-            'message': 'Authentication failed. Please login again.',
-          };
-        }
-        sessionId = _sessionId;
-      }
+      // if (sessionId == null) {
+      //   print(
+      //     '⚠️ [BusTripService] No sessionId found, attempting re-authentication',
+      //   );
+      //   final reAuthSuccess = await _reAuthenticate();
+      //   if (!reAuthSuccess) {
+      //     print(
+      //       '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
+      //     );
+      //     return {
+      //       'status': false,
+      //       'message': 'Authentication failed. Please login again.',
+      //     };
+      //   }
+      //   sessionId = _sessionId;
+      // }
       // Build query string
       String query = 'trip_date=$tripDate';
       if (userId != null && userId.isNotEmpty) {
@@ -523,7 +500,11 @@ class BusTripService {
       }
     } catch (e) {
       print('❌ [BusTripService] Network error: $e');
-      return {'status': false, 'message': 'Network error: $e'};
+      return {
+        'status': false,
+        'message':
+            'Tidak dapat terhubung ke server. Silakan periksa koneksi internet Anda dan coba lagi.',
+      };
     }
   }
 
@@ -537,22 +518,22 @@ class BusTripService {
       );
 
       String? sessionId = await _getSessionId();
-      if (sessionId == null) {
-        print(
-          '⚠️ [BusTripService] No sessionId found, attempting re-authentication',
-        );
-        final reAuthSuccess = await _reAuthenticate();
-        if (!reAuthSuccess) {
-          print(
-            '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
-          );
-          return {
-            'status': false,
-            'message': 'Authentication failed. Please login again.',
-          };
-        }
-        sessionId = _sessionId;
-      }
+      // if (sessionId == null) {
+      //   print(
+      //     '⚠️ [BusTripService] No sessionId found, attempting re-authentication',
+      //   );
+      //   final reAuthSuccess = await _reAuthenticate();
+      //   if (!reAuthSuccess) {
+      //     print(
+      //       '❌ [BusTripService] Re-authentication failed, cannot proceed with request',
+      //     );
+      //     return {
+      //       'status': false,
+      //       'message': 'Authentication failed. Please login again.',
+      //     };
+      //   }
+      //   sessionId = _sessionId;
+      // }
 
       final Uri uri = Uri.parse(
         '${ApiConfig.baseUrl}${ApiConfig.updateBusTripState}/$tripId/update_state',
@@ -622,7 +603,89 @@ class BusTripService {
       }
     } catch (e) {
       print('❌ [BusTripService] Network error: $e');
-      return {'status': false, 'message': 'Network error: $e'};
+      return {
+        'status': false,
+        'message':
+            'Tidak dapat terhubung ke server. Silakan periksa koneksi internet Anda dan coba lagi.',
+      };
+    }
+  }
+
+  // --- FUNGSI BARU DIMULAI DI SINI ---
+  Future<Map<String, dynamic>> getTripChatter(int tripId) async {
+    try {
+      print('📝 [BusTripService] Fetching chatter for tripId: $tripId');
+      String? sessionId = await _getSessionId();
+
+      final uri = Uri.parse('${ApiConfig.baseUrl}/bus_trip/$tripId/chatter');
+      print('🌐 [BusTripService] Making request to: ${uri.toString()}');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Cookie': 'session_id=$sessionId',
+        },
+      );
+
+      print(
+        '📡 [BusTripService] Chatter response status: ${response.statusCode}',
+      );
+
+      // Jika sesi tidak valid (404), coba otentikasi ulang
+      if (response.statusCode == 404) {
+        print(
+          '⚠️ [BusTripService] Not Found (404), attempting re-authentication for chatter',
+        );
+        final reAuthSuccess = await _reAuthenticate();
+        if (reAuthSuccess) {
+          print(
+            '🔄 [BusTripService] Re-authentication successful, retrying chatter request',
+          );
+          final retryResponse = await http.get(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Cookie': 'session_id=$_sessionId',
+            },
+          );
+          print(
+            '📡 [BusTripService] Chatter retry response status: ${retryResponse.statusCode}',
+          );
+          if (retryResponse.statusCode == 200) {
+            print('✅ [BusTripService] Chatter retry successful');
+            return jsonDecode(retryResponse.body);
+          }
+        }
+        print('❌ [BusTripService] Chatter retry failed');
+        return {
+          'status': false,
+          'message': 'Sesi Anda telah berakhir. Silakan muat ulang halaman.',
+        };
+      }
+
+      if (response.statusCode == 200) {
+        print('✅ [BusTripService] Chatter request successful');
+        return jsonDecode(response.body);
+      } else {
+        print(
+          '❌ [BusTripService] Chatter request failed with status: ${response.statusCode}',
+        );
+        return {
+          'status': false,
+          'message':
+              'Tidak dapat memuat riwayat perjalanan. Kode: ${response.statusCode}',
+        };
+      }
+    } catch (e) {
+      print('❌ [BusTripService] Chatter network error: $e');
+      return {
+        'status': false,
+        'message':
+            'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.',
+      };
     }
   }
 }

@@ -1,9 +1,10 @@
+// file: lib/screens/multi_bus_map_screen.dart
+
 import 'dart:ui';
-import 'package:amman_tms_mobile/screens/bus_trip/add_bus_trip_screen.dart';
-import 'dart:async'; // Import for Timer
+import 'dart:async';
 import 'dart:convert';
-import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Diperlukan untuk SystemNavigator
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -13,7 +14,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:amman_tms_mobile/core/api/api_config.dart';
 import 'package:amman_tms_mobile/core/services/auth_service.dart';
-import 'package:amman_tms_mobile/core/services/traccar_service.dart'; // Import TraccarService
+import 'package:amman_tms_mobile/core/services/traccar_service.dart';
 import 'package:amman_tms_mobile/models/bus_info.dart';
 import 'package:amman_tms_mobile/models/bus_status.dart';
 import 'package:amman_tms_mobile/widgets/bus_list_item_widget.dart';
@@ -32,11 +33,6 @@ class MultiBusMapScreen extends StatefulWidget {
 class _MultiBusMapScreenState extends State<MultiBusMapScreen>
     with TickerProviderStateMixin {
   final AuthService _authService = AuthService();
-  // --- DATA SIMULASI ---
-  // Dalam aplikasi nyata, data ini akan diambil dari API secara terpisah.
-  // --- END OF DATA SIMULASI --- // Remove hardcoded JSON
-
-  // Pagination variables
   int _currentPage = 1;
   final int _perPage = 10;
   bool _isLoading = false;
@@ -45,11 +41,12 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
   late List<BusInfo> allBuses = [];
   late List<BusStatus> allBusStatus = [];
   BusInfo? selectedBus;
-  BusStatus? liveBusStatus; // To store live position data
-  Timer? _liveTrackingTimer; // Timer for live tracking
+  BusStatus? liveBusStatus;
+  Timer? _liveTrackingTimer;
 
   late final MapController _mapController;
   late final AnimationController _animationController;
+  // UBAH: Default map menjadi light (street)
   MapType _currentMapType = MapType.street;
 
   late final ScrollController _scrollController;
@@ -69,50 +66,35 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
     });
   }
 
+  // --- FUNGSI LOGIKA (TIDAK DIUBAH) ---
   Future<void> _loadData() async {
     if (_isLoading || !_hasMore) return;
     setState(() {
       _isLoading = true;
     });
-
     await _authService.initializeSession();
     try {
-      // Ensure session is valid before making API call
       final reAuthSuccess = await _reAuthenticate();
       if (!reAuthSuccess) {
-        print(
-          '❌ [MultiBusMapScreen] Re-authentication failed, cannot proceed with request',
-        );
         return;
       }
-      // Session ID should now be available via _authService.sessionId if _reAuthenticate was successful
-
       final Uri uri = Uri.parse(
         '${ApiConfig.baseUrl}/traccar/device?page=$_currentPage&per_page=$_perPage&pagination=1',
       );
-
       final response = await http.get(
         uri,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Cookie': 'session_id=$_sessionId', // Use JSESSIONID for Traccar
+          'Cookie': 'session_id=$_sessionId',
         },
       );
-
       if (response.statusCode == 200) {
-        print('API Response Status: ${response.statusCode}');
-        print('API Response Body: ${response.body}');
         final Map<String, dynamic> responseBody = jsonDecode(response.body);
         final busListResponse = busListResponseFromJson(
           jsonEncode(responseBody),
         );
         final newBuses = busListResponse.data;
-
-        // For bus status, we'll need a separate endpoint or integrate it
-        // For now, let's assume bus status comes with bus info or is fetched separately
-        // This part needs to be adapted based on actual Traccar API for status
-        // For simulation, we'll create dummy status for new buses
         final newBusStatus = newBuses
             .map(
               (bus) => BusStatus(
@@ -132,26 +114,17 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
               ),
             )
             .toList();
-
         setState(() {
           allBuses.addAll(newBuses);
-          allBusStatus.addAll(newBusStatus); // Add new statuses
+          allBusStatus.addAll(newBusStatus);
           _currentPage++;
-          _hasMore =
-              newBuses.length == _perPage; // Check if there are more pages
+          _hasMore = newBuses.length == _perPage;
         });
       } else if (response.statusCode == 404) {
-        // Unauthorized, try to re-authenticate and retry
         final reAuthSuccess = await _reAuthenticate();
         if (reAuthSuccess) {
-          await _loadData(); // Retry loading data after re-authentication
-        } else {
-          print('Authentication failed. Please login again.');
+          await _loadData();
         }
-      } else {
-        print(
-          'Failed to load bus data: ${response.statusCode}. Response body: ${response.body}',
-        );
       }
     } catch (e) {
       print('Error loading bus data: $e');
@@ -180,10 +153,7 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
           },
         }),
       );
-
       if (response.statusCode == 200) {
-        print('Auth API Response Status: ${response.statusCode}');
-        print('Auth API Response Body: ${response.body}');
         final cookies = response.headers['set-cookie'];
         if (cookies != null) {
           final newSessionId = RegExp(
@@ -191,19 +161,12 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
           ).firstMatch(cookies)?.group(1);
           if (newSessionId != null) {
             _sessionId = newSessionId;
-            print(
-              'Re-authentication successful, new sessionId obtained: $_sessionId',
-            );
             return true;
           }
         }
       }
-      print(
-        'Re-authentication failed: Status ${response.statusCode}. Response body: ${response.body}',
-      );
       return false;
     } catch (e) {
-      print('Re-authentication error: $e');
       return false;
     }
   }
@@ -222,28 +185,10 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
       timer,
     ) async {
       final positions = await TraccarService.fetchBusPositions(deviceId);
-      if (positions.isNotEmpty) {
+      if (positions.isNotEmpty && mounted) {
         final latestPosition = positions.first;
         setState(() {
-          liveBusStatus = BusStatus(
-            deviceId: latestPosition['deviceId'],
-            attributes: Attributes(
-              ignition: latestPosition['attributes']['ignition'] ?? false,
-              motion: latestPosition['attributes']['motion'] ?? false,
-              power:
-                  (latestPosition['attributes']['power'] as num?)?.toDouble() ??
-                  0.0,
-              odometer:
-                  (latestPosition['attributes']['odometer'] as num?)?.toInt() ??
-                  0,
-            ),
-            latitude: (latestPosition['latitude'] as num).toDouble(),
-            longitude: (latestPosition['longitude'] as num).toDouble(),
-            speed: (latestPosition['speed'] as num).toDouble(),
-            course: (latestPosition['course'] as num).toDouble(),
-            deviceTime: DateTime.parse(latestPosition['deviceTime']),
-            address: latestPosition['address'],
-          );
+          liveBusStatus = BusStatus.fromJson(latestPosition);
           _mapController.move(
             LatLng(liveBusStatus!.latitude, liveBusStatus!.longitude),
             _mapController.zoom,
@@ -252,10 +197,11 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
       }
     });
   }
+  // --- END OF FUNGSI LOGIKA ---
 
   @override
   void dispose() {
-    _liveTrackingTimer?.cancel(); // Cancel timer when screen is disposed
+    _liveTrackingTimer?.cancel();
     _mapController.dispose();
     _animationController.dispose();
     _scrollController.dispose();
@@ -271,70 +217,93 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
   void _onBusSelected(BusInfo bus) {
     setState(() {
       selectedBus = bus;
-      _liveTrackingTimer?.cancel(); // Cancel any existing timer
-      liveBusStatus = null; // Clear previous live status
-
-      // Find the corresponding BusStatus for the selected bus
+      _liveTrackingTimer?.cancel();
+      liveBusStatus = null;
       final status = allBusStatus.firstWhere(
         (s) => s.deviceId.toString() == bus.deviceId,
         orElse: () => BusStatus(
           deviceId: int.parse(bus.deviceId),
-          attributes: Attributes(
-            ignition: false,
-            motion: false,
-            power: 0.0,
-            odometer: 0,
-          ),
           latitude: bus.lastLatitude,
           longitude: bus.lastLongitude,
           speed: 0.0,
-          course: 0,
+          course: 0.0,
           deviceTime: DateTime.now(),
+          attributes: Attributes.empty(),
           address: 'Unknown Address',
         ),
       );
-      liveBusStatus = status; // Set initial live status
-
-      // Move map to selected bus location
+      liveBusStatus = status;
       _mapController.move(
         LatLng(liveBusStatus!.latitude, liveBusStatus!.longitude),
         15.0,
       );
-
-      // Start live tracking
       _startLiveTracking(int.parse(bus.deviceId));
     });
   }
 
   void _clearSelection() {
-    _liveTrackingTimer?.cancel(); // Cancel live tracking timer
+    _liveTrackingTimer?.cancel();
     setState(() => selectedBus = null);
   }
 
   @override
   Widget build(BuildContext context) {
+    // UBAH: Mendefinisikan warna berdasarkan tema map
+    final bool isDarkMode = _currentMapType == MapType.dark;
+    final Color panelColor = isDarkMode
+        ? const Color(0xFF1C1C1E)
+        : Colors.white;
+    final Color primaryTextColor = isDarkMode ? Colors.white : Colors.black87;
+    final Color secondaryTextColor = isDarkMode
+        ? const Color(0xFF8E8E93)
+        : Colors.grey.shade600;
+    final Color cardColor = isDarkMode
+        ? const Color(0xFF2C2C2E)
+        : Colors.grey.shade50;
+    const Color accentColor = Color(0xFFE0B352);
+
     return Scaffold(
+      backgroundColor: isDarkMode
+          ? const Color(0xFF121212)
+          : Colors.grey.shade200,
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: Text(
-          selectedBus == null ? 'Semua Armada Bus' : selectedBus!.vehicle.name,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: kPrimaryBlue,
+      appBar: _buildAppBar(primaryTextColor),
+      body: Stack(
+        children: [
+          _buildMap(),
+          _buildDraggablePanel(
+            panelColor,
+            primaryTextColor,
+            secondaryTextColor,
+            cardColor,
+            accentColor,
+          ),
+        ],
+      ),
+      floatingActionButton: _buildFloatingActionButtons(isDarkMode),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(Color textColor) {
+    return AppBar(
+      title: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        transitionBuilder: (child, animation) =>
+            FadeTransition(opacity: animation, child: child),
+        child: Text(
+          selectedBus == null ? 'Pantauan Armada' : selectedBus!.vehicle.name,
+          key: ValueKey(selectedBus?.id ?? 'all'),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: textColor,
+            fontFamily: 'Poppins',
+            fontSize: 18,
           ),
         ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: selectedBus != null
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new),
-                onPressed: _clearSelection,
-              )
-            : null,
       ),
-      body: Stack(children: [_buildMap(), _buildDraggablePanel()]),
-      floatingActionButton: _buildFloatingActionButtons(),
+      centerTitle: true,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
     );
   }
 
@@ -342,42 +311,37 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
     final mapUrls = {
       MapType.dark:
           'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      MapType.street: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      MapType.street:
+          'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
     };
-
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
-        initialCenter: const LatLng(-9.012, 116.808), // Lokasi awal tengah
+        initialCenter: const LatLng(-6.97, 107.76),
         initialZoom: 14.0,
       ),
       children: [
-        TileLayer(urlTemplate: mapUrls[_currentMapType]!),
+        TileLayer(
+          urlTemplate: mapUrls[_currentMapType]!,
+          retinaMode: RetinaMode.isHighDensity(context),
+        ),
         MarkerLayer(
           markers: allBuses.map((bus) {
             final status = allBusStatus.firstWhere(
               (s) => s.deviceId.toString() == bus.deviceId,
               orElse: () => BusStatus.empty(),
             );
+            final isSelected = bus.deviceId == selectedBus?.deviceId;
+            final currentStatus = isSelected && liveBusStatus != null
+                ? liveBusStatus!
+                : status;
             return Marker(
-              point: LatLng(
-                bus.deviceId == selectedBus?.deviceId && liveBusStatus != null
-                    ? liveBusStatus!.latitude
-                    : bus.lastLatitude,
-                bus.deviceId == selectedBus?.deviceId && liveBusStatus != null
-                    ? liveBusStatus!.longitude
-                    : bus.lastLongitude,
-              ),
+              point: LatLng(currentStatus.latitude, currentStatus.longitude),
               width: 80,
               height: 80,
               child: GestureDetector(
                 onTap: () => _onBusSelected(bus),
-                child: _buildBusMarker(
-                  bus.deviceId == selectedBus?.deviceId && liveBusStatus != null
-                      ? liveBusStatus!
-                      : status,
-                  bus.deviceId == selectedBus?.deviceId,
-                ),
+                child: _buildBusMarker(currentStatus, isSelected),
               ),
             );
           }).toList(),
@@ -387,13 +351,13 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
   }
 
   Widget _buildBusMarker(BusStatus status, bool isSelected) {
+    final bool isDarkMode = _currentMapType == MapType.dark;
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
         final rippleSize =
             (status.attributes.motion ? _animationController.value : 0) * 50;
         final rippleOpacity = 1 - _animationController.value;
-
         return Center(
           child: Stack(
             alignment: Alignment.center,
@@ -404,9 +368,9 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
                   height: rippleSize.toDouble(),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Theme.of(
-                      context,
-                    ).primaryColor.withOpacity(rippleOpacity * 0.5),
+                    color: const Color(
+                      0xFFE0B352,
+                    ).withOpacity(rippleOpacity * 0.5),
                   ),
                 ),
               Transform.rotate(
@@ -416,12 +380,15 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? Theme.of(context).primaryColor
-                        : Theme.of(context).colorScheme.surface,
+                        ? const Color(0xFFE0B352)
+                        : (isDarkMode ? const Color(0xFF1C1C1E) : Colors.white),
                     shape: BoxShape.circle,
-                    border: isSelected
-                        ? Border.all(color: Colors.white, width: 2)
-                        : null,
+                    border: Border.all(
+                      color: isSelected
+                          ? (isDarkMode ? Colors.white : Colors.black)
+                          : (isDarkMode ? Colors.white24 : Colors.black26),
+                      width: 1.5,
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.5),
@@ -433,9 +400,9 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
                   child: FaIcon(
                     FontAwesomeIcons.busSimple,
                     color: isSelected
-                        ? Colors.white
-                        : Theme.of(context).primaryColor,
-                    size: 24,
+                        ? (isDarkMode ? Colors.black : Colors.white)
+                        : (isDarkMode ? Colors.white : Colors.black87),
+                    size: 20,
                   ),
                 ),
               ),
@@ -446,23 +413,50 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
     );
   }
 
-  Widget _buildDraggablePanel() {
+  Widget _buildDraggablePanel(
+    Color panelColor,
+    Color primaryTextColor,
+    Color secondaryTextColor,
+    Color cardColor,
+    Color accentColor,
+  ) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.35,
+      initialChildSize: 0.3,
       minChildSize: 0.15,
-      maxChildSize: 0.8,
+      maxChildSize: 0.85,
       builder: (context, scrollController) {
         return ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
             child: Container(
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
+              decoration: BoxDecoration(
+                color: panelColor.withOpacity(0.85),
+                border: Border(
+                  top: BorderSide(
+                    color: primaryTextColor.withOpacity(0.2),
+                    width: 1.5,
+                  ),
+                ),
+              ),
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 400),
                 child: selectedBus == null
-                    ? _buildBusListView(scrollController)
-                    : _buildDetailView(scrollController, selectedBus!),
+                    ? _buildBusListView(
+                        scrollController,
+                        primaryTextColor,
+                        secondaryTextColor,
+                        cardColor,
+                        accentColor,
+                      )
+                    : _buildDetailView(
+                        scrollController,
+                        selectedBus!,
+                        primaryTextColor,
+                        secondaryTextColor,
+                        cardColor,
+                        accentColor,
+                      ),
               ),
             ),
           ),
@@ -471,46 +465,56 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
     );
   }
 
-  Widget _buildBusListView(ScrollController controller) {
+  Widget _buildBusListView(
+    ScrollController controller,
+    Color primaryTextColor,
+    Color secondaryTextColor,
+    Color cardColor,
+    Color accentColor,
+  ) {
     return Column(
       key: const ValueKey('busList'),
       children: [
+        _buildGrabber(primaryTextColor),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Container(
-            width: 40,
-            height: 5,
-            decoration: BoxDecoration(
-              color: Colors.grey[600],
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 8.0),
-          child: Text(
-            "Daftar Armada",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          padding: const EdgeInsets.fromLTRB(4.0, 0, 16.0, 16.0),
+          child: Row(
+            children: [
+              // (HAPUS) IconButton close (x) di sini
+              Expanded(
+                child: Text(
+                  "Daftar Armada",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Poppins',
+                    color: primaryTextColor,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 48), // Spacer untuk menyeimbangkan tombol
+            ],
           ),
         ),
         Expanded(
           child: ListView.builder(
             controller: controller,
-            itemCount:
-                allBuses.length +
-                (_hasMore ? 1 : 0), // Add 1 for loading indicator
+            padding: EdgeInsets.zero,
+            itemCount: allBuses.length + (_hasMore ? 1 : 0),
             itemBuilder: (context, index) {
               if (index == allBuses.length) {
-                if (_isLoading) {
-                  return const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                } else {
-                  return const SizedBox.shrink(); // No more data and not loading
-                }
+                return _isLoading
+                    ? const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFE0B352),
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink();
               }
-
               final bus = allBuses[index];
               final status = allBusStatus.firstWhere(
                 (s) => s.deviceId.toString() == bus.deviceId,
@@ -520,6 +524,11 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
                 busInfo: bus,
                 busStatus: status,
                 onTap: () => _onBusSelected(bus),
+                // UBAH: Mengirimkan warna dinamis
+                cardColor: cardColor,
+                primaryTextColor: primaryTextColor,
+                secondaryTextColor: secondaryTextColor,
+                accentColor: accentColor,
               ).animate().fadeIn(delay: (100 * index).ms).slideX(begin: 0.2);
             },
           ),
@@ -528,7 +537,14 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
     );
   }
 
-  Widget _buildDetailView(ScrollController controller, BusInfo bus) {
+  Widget _buildDetailView(
+    ScrollController controller,
+    BusInfo bus,
+    Color primaryTextColor,
+    Color secondaryTextColor,
+    Color cardColor,
+    Color accentColor,
+  ) {
     final displayStatus =
         selectedBus?.deviceId == bus.deviceId && liveBusStatus != null
         ? liveBusStatus!
@@ -540,64 +556,64 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
     Color statusColor;
     switch (statusText) {
       case 'Trip Confirmed':
-        statusColor = Theme.of(context).primaryColor;
+        statusColor = accentColor;
         break;
       case 'Ready':
-        statusColor = Colors.green;
+        statusColor = Colors.greenAccent.shade400;
         break;
       case 'On Trip':
-        statusColor = Colors.blue;
+        statusColor = Colors.blueAccent;
         break;
       case 'Maintenance':
-        statusColor = Colors.red;
+        statusColor = Colors.redAccent.shade400;
         break;
       default:
-        statusColor = Colors.grey;
+        statusColor = secondaryTextColor;
     }
-
     return ListView(
       key: ValueKey('detailView_${bus.id}'),
       controller: controller,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
-        Center(
-          child: Container(
-            width: 40,
-            height: 5,
-            decoration: BoxDecoration(
-              color: Colors.grey[600],
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new),
-            onPressed: _clearSelection,
-          ),
-        ),
-        const SizedBox(height: 12),
-        // Primary Info
+        _buildGrabber(primaryTextColor),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Text(
-              'Status Langsung',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            // UBAH: Tombol back ditambahkan di detail view juga untuk konsistensi
+            IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios_new,
+                color: primaryTextColor,
+                size: 20,
+              ),
+              onPressed: _clearSelection,
+            ),
+            Expanded(
+              child: Text(
+                'Detail Armada',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Poppins',
+                  color: primaryTextColor,
+                ),
+              ),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: statusColor.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: statusColor, width: 1.5),
               ),
               child: Text(
                 statusText,
                 style: TextStyle(
                   color: statusColor,
                   fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  fontFamily: 'Poppins',
                 ),
               ),
             ),
@@ -612,41 +628,61 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
               value: displayStatus.speedInKmh.toStringAsFixed(0),
               unit: 'km/h',
               label: 'Kecepatan',
+              cardColor: cardColor,
+              primaryTextColor: primaryTextColor,
+              secondaryTextColor: secondaryTextColor,
+              accentColor: accentColor,
             ),
+            const SizedBox(width: 12),
             StatusCardWidget(
               icon: FontAwesomeIcons.key,
               value: displayStatus.attributes.ignition ? 'ON' : 'OFF',
               label: 'Mesin',
               color: displayStatus.attributes.ignition
-                  ? Theme.of(context).primaryColor
-                  : Colors.redAccent,
+                  ? Colors.greenAccent.shade400
+                  : Colors.redAccent.shade400,
+              cardColor: cardColor,
+              primaryTextColor: primaryTextColor,
+              secondaryTextColor: secondaryTextColor,
+              accentColor: accentColor,
             ),
+            const SizedBox(width: 12),
             StatusCardWidget(
               icon: displayStatus.attributes.motion
                   ? FontAwesomeIcons.route
                   : FontAwesomeIcons.squareParking,
-              value: displayStatus.attributes.motion ? 'YA' : 'TIDAK',
+              value: displayStatus.attributes.motion ? 'JALAN' : 'DIAM',
               label: 'Gerak',
               color: displayStatus.attributes.motion
-                  ? Theme.of(context).primaryColor
-                  : Colors.grey[400],
+                  ? Colors.blueAccent
+                  : secondaryTextColor,
+              cardColor: cardColor,
+              primaryTextColor: primaryTextColor,
+              secondaryTextColor: secondaryTextColor,
+              accentColor: accentColor,
             ),
           ],
         ),
         const SizedBox(height: 16),
-        const Divider(color: Colors.white24, height: 1),
-        const SizedBox(height: 16),
-        // Secondary Info
+        Divider(
+          color: primaryTextColor.withOpacity(0.1),
+          height: 24,
+          thickness: 1,
+        ),
         DetailItemWidget(
           icon: FontAwesomeIcons.gaugeHigh,
           title: 'Odometer',
           value:
               '${NumberFormat('#,##0').format(displayStatus.attributes.odometer / 1000)} km',
+          primaryTextColor: primaryTextColor,
+          secondaryTextColor: secondaryTextColor,
         ),
         DetailItemWidget(
           icon: FontAwesomeIcons.carBattery,
           title: 'Sumber Daya',
           value: '${displayStatus.attributes.power.toStringAsFixed(1)} V',
+          primaryTextColor: primaryTextColor,
+          secondaryTextColor: secondaryTextColor,
         ),
         DetailItemWidget(
           icon: FontAwesomeIcons.clock,
@@ -655,48 +691,78 @@ class _MultiBusMapScreenState extends State<MultiBusMapScreen>
             'd MMM yyyy, HH:mm:ss',
             'id_ID',
           ).format(displayStatus.deviceTime.toLocal()),
+          primaryTextColor: primaryTextColor,
+          secondaryTextColor: secondaryTextColor,
         ),
         DetailItemWidget(
           icon: FontAwesomeIcons.mapPin,
           title: 'Alamat Terakhir',
           value: displayStatus.address ?? 'Data alamat tidak tersedia',
           isAddress: true,
+          primaryTextColor: primaryTextColor,
+          secondaryTextColor: secondaryTextColor,
         ),
-      ].animate(interval: 100.ms).fadeIn(duration: 300.ms).slideY(begin: 0.5),
+      ].animate(interval: 80.ms).fadeIn(duration: 300.ms).slideY(begin: 0.3),
     );
   }
 
-  Widget _buildFloatingActionButtons() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        FloatingActionButton(
-          onPressed: () {
-            if (selectedBus != null) {
-              _onBusSelected(selectedBus!);
-            }
-          },
-          heroTag: 'centerMap',
-          mini: true,
-          child: const FaIcon(FontAwesomeIcons.locationCrosshairs, size: 18),
+  Widget _buildGrabber(Color textColor) {
+    return Center(
+      child: Container(
+        width: 40,
+        height: 5,
+        margin: const EdgeInsets.symmetric(vertical: 12.0),
+        decoration: BoxDecoration(
+          color: textColor.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(12),
         ),
-        const SizedBox(height: 10),
-        FloatingActionButton(
-          onPressed: _toggleMapType,
-          heroTag: 'toggleMap',
-          mini: true,
-          child: FaIcon(
-            _currentMapType == MapType.dark
-                ? FontAwesomeIcons.solidSun
-                : FontAwesomeIcons.solidMoon,
-            size: 18,
+      ),
+    );
+  }
+
+  Widget _buildFloatingActionButtons(bool isDarkMode) {
+    final fabColor = isDarkMode ? const Color(0xFF1C1C1E) : Colors.white;
+    final iconColor = isDarkMode ? Colors.white : Colors.black87;
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).size.height * 0.15,
+        right: 4,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            onPressed: () {
+              if (selectedBus != null) {
+                _mapController.move(
+                  LatLng(liveBusStatus!.latitude, liveBusStatus!.longitude),
+                  15.0,
+                );
+              }
+            },
+            heroTag: 'centerMap',
+            backgroundColor: fabColor,
+            mini: true,
+            child: FaIcon(
+              FontAwesomeIcons.locationCrosshairs,
+              size: 16,
+              color: iconColor,
+            ),
           ),
-        ),
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 0.15,
-        ), // Adjust space based on screen
-      ],
+          const SizedBox(height: 10),
+          FloatingActionButton(
+            onPressed: _toggleMapType,
+            heroTag: 'toggleMap',
+            backgroundColor: fabColor,
+            mini: true,
+            child: FaIcon(
+              isDarkMode ? FontAwesomeIcons.sun : FontAwesomeIcons.moon,
+              size: 16,
+              color: iconColor,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

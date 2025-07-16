@@ -96,6 +96,7 @@ class TimelineRouteView extends StatelessWidget {
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                           fontSize: rSize(10), // MODIFIED
+                          fontFamily: 'Poppins',
                         ),
                       ),
                     ),
@@ -134,6 +135,7 @@ class TimelineRouteView extends StatelessWidget {
                                 fontWeight: FontWeight.bold,
                                 fontSize: rSize(14), // MODIFIED
                                 color: kPrimaryBlue,
+                                fontFamily: 'Poppins',
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -150,6 +152,7 @@ class TimelineRouteView extends StatelessWidget {
                                   fontWeight: FontWeight.w600,
                                   fontSize: rSize(13), // MODIFIED
                                   color: kPrimaryBlue,
+                                  fontFamily: 'Poppins',
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -172,6 +175,7 @@ class TimelineRouteView extends StatelessWidget {
                                       fontWeight: FontWeight.w600,
                                       fontSize: rSize(12), // MODIFIED
                                       color: kAccentGold,
+                                      fontFamily: 'Poppins',
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -187,6 +191,7 @@ class TimelineRouteView extends StatelessWidget {
                                       style: TextStyle(
                                         fontSize: rSize(12), // MODIFIED
                                         color: kAccentGold,
+                                        fontFamily: 'Poppins',
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -207,6 +212,7 @@ class TimelineRouteView extends StatelessWidget {
                                     style: TextStyle(
                                       fontSize: rSize(11), // MODIFIED
                                       color: kSlateGray,
+                                      fontFamily: 'Poppins',
                                     ),
                                   ),
                                 ],

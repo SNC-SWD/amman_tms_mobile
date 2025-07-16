@@ -270,15 +270,21 @@ class _PlanTripScreenState extends State<PlanTripScreen> {
             ? Center(
                 child: Text(
                   _errorMessage!,
-                  style: const TextStyle(color: kSlateGray),
+                  style: const TextStyle(
+                    color: kSlateGray,
+                    fontFamily: 'Poppins',
+                  ),
                   textAlign: TextAlign.center,
                 ),
               )
             : _planTrips.isEmpty
-            ? const Center(
+            ? Center(
                 child: Text(
                   'No trip to confirm found',
-                  style: TextStyle(color: kSlateGray),
+                  style: const TextStyle(
+                    color: kSlateGray,
+                    fontFamily: 'Poppins',
+                  ),
                 ),
               )
             : ListView.builder(

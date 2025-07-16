@@ -32,22 +32,20 @@ class RouteService {
     return _sessionId;
   }
 
-  Future<bool> _reAuthenticate() async {
+  Future<bool> _reAuthenticate({int retryCount = 0}) async {
+    if (retryCount >= 3) {
+      print('❌ [RouteService] Max re-authentication retries reached.');
+      return false;
+    }
     try {
       print('🔄 [RouteService] Attempting re-authentication...');
       final Uri authUri = Uri.parse('${ApiConfig.connectionEndpoint}');
-
-      print(
-        '🔑 [RouteService] Re-authentication request body: Username: ${_authService.username}, Password: ${_authService.password}',
-      );
-
       final response = await http.post(
         authUri,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-
         body: jsonEncode({
           "jsonrpc": "2.0",
           "params": {
@@ -60,6 +58,9 @@ class RouteService {
 
       print(
         '🔐 [RouteService] Re-authentication response status: ${response.statusCode}',
+      );
+      print(
+        '🔐 [RouteService] Re-authenticating with username: ${_authService.username} and password: ${_authService.password != null && _authService.password!.isNotEmpty ? '********' : 'N/A'}',
       );
 
       if (response.statusCode == 200) {
@@ -92,6 +93,8 @@ class RouteService {
   }
 
   Future<Map<String, dynamic>> getRoutes({
+    int retryCount = 0,
+
     String? driverId,
     int? page,
     int? perPage,
@@ -102,17 +105,22 @@ class RouteService {
         '🛣️ [RouteService] Fetching routes${driverId != null ? ' for driver: $driverId' : ''}${page != null ? ' page: $page' : ''}',
       );
 
+      String? sessionId = await _getSessionId();
+
       // Ensure session is valid before making API call
-      final reAuthSuccess = await _reAuthenticate();
-      if (!reAuthSuccess) {
-        print(
-          '❌ [RouteService] Re-authentication failed, cannot proceed with request',
-        );
-        return {
-          'status': false,
-          'message': 'Authentication failed. Please login again.',
-        };
-      }
+      // final reAuthSuccess = await _reAuthenticate(retryCount: retryCount);
+      // if (!reAuthSuccess) {
+      //   print(
+      //     '❌ [RouteService] Re-authentication failed, cannot proceed with request',
+      //   );
+      //   return {
+      //     'status': false,
+      //     'message': 'Authentication failed. Please login again.',
+      //   };
+      // }
+
+      // sessionId = _authService
+      //     .sessionId; // Use the sessionId from AuthService after re-authentication
 
       final Map<String, String> queryParams = {};
       if (driverId != null) {
@@ -143,7 +151,7 @@ class RouteService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Cookie': 'session_id=$_sessionId',
+          'Cookie': 'session_id=$sessionId',
         },
       );
 
@@ -153,27 +161,35 @@ class RouteService {
         print(
           '⚠️ [RouteService] Not Found (404), attempting re-authentication',
         );
-        final reAuthSuccess = await _reAuthenticate();
+        final reAuthSuccess = await _reAuthenticate(retryCount: retryCount + 1);
         if (reAuthSuccess) {
-          print(
-            '🔄 [RouteService] Re-authentication successful, retrying request',
-          );
-          final retryResponse = await http.get(
-            uri,
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Cookie': 'session_id=$_sessionId',
-            },
-          );
+          if (retryCount < 3) {
+            print(
+              '🔄 [RouteService] Re-authentication successful, retrying request',
+            );
+            final retryResponse = await http.get(
+              uri,
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Cookie': 'session_id=$_sessionId',
+              },
+            );
 
-          print(
-            '📡 [RouteService] Retry response status: ${retryResponse.statusCode}',
-          );
+            print(
+              '📡 [RouteService] Retry response status: ${retryResponse.statusCode}',
+            );
 
-          if (retryResponse.statusCode == 200) {
-            print('✅ [RouteService] Retry successful, returning data');
-            return jsonDecode(retryResponse.body);
+            if (retryResponse.statusCode == 200) {
+              print('✅ [RouteService] Retry successful, returning data');
+              return jsonDecode(retryResponse.body);
+            } else {
+              print('❌ [RouteService] Max retries reached for getRoutes.');
+              return {
+                'status': false,
+                'message': 'Authentication failed. Please login again.',
+              };
+            }
           }
         }
         print('❌ [RouteService] Retry failed, returning error');
@@ -196,6 +212,8 @@ class RouteService {
   }
 
   Future<Map<String, dynamic>> createRoute({
+    int retryCount = 0,
+
     required BusPoint boardingPoint,
     required BusPoint droppingPoint,
     required Fleet fleet,
@@ -206,7 +224,7 @@ class RouteService {
   }) async {
     try {
       // Ensure session is valid before making API call
-      final reAuthSuccess = await _reAuthenticate();
+      final reAuthSuccess = await _reAuthenticate(retryCount: retryCount);
       if (!reAuthSuccess) {
         print(
           '❌ [RouteService] Re-authentication failed, cannot proceed with request',
@@ -256,18 +274,26 @@ class RouteService {
         print(
           '⚠️ [RouteService] Session expired, attempting re-authentication...',
         );
-        final reAuthSuccess = await _reAuthenticate();
+        final reAuthSuccess = await _reAuthenticate(retryCount: retryCount + 1);
         if (reAuthSuccess) {
-          // Retry the request with new session
-          return createRoute(
-            boardingPoint: boardingPoint,
-            droppingPoint: droppingPoint,
-            fleet: fleet,
-            startTime: startTime,
-            endTime: endTime,
-            routeLines: routeLines,
-            busPoints: busPoints,
-          );
+          if (retryCount < 3) {
+            // Retry the request with new session
+            return createRoute(
+              boardingPoint: boardingPoint,
+              droppingPoint: droppingPoint,
+              fleet: fleet,
+              startTime: startTime,
+              endTime: endTime,
+              routeLines: routeLines,
+              busPoints: busPoints,
+            );
+          } else {
+            print('❌ [RouteService] Max retries reached for createRoute.');
+            return {
+              'status': false,
+              'message': 'Authentication failed. Please login again.',
+            };
+          }
         }
       }
 
@@ -283,6 +309,8 @@ class RouteService {
   }
 
   Future<Map<String, dynamic>> updateRoute({
+    int retryCount = 0,
+
     required String name,
     required int routeId,
     required int boardingId,
@@ -312,7 +340,7 @@ class RouteService {
         };
       }
 
-      String? sessionId = _sessionId;
+      String? sessionId = this._sessionId;
 
       print('📤 [RouteService] Updating route with ID: $routeId');
       print('📝 [RouteService] Request payload:');
@@ -326,7 +354,7 @@ class RouteService {
 
       final response = await http
           .put(
-            Uri.parse('$baseUrl/route/update/$routeId'),
+            Uri.parse('${this.baseUrl}/route/update/$routeId'),
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
@@ -344,6 +372,34 @@ class RouteService {
           )
           .timeout(const Duration(seconds: 10));
 
+      if (response.statusCode == 404) {
+        print(
+          '⚠️ [RouteService] Session expired, attempting re-authentication...',
+        );
+        final reAuthSuccess = await _reAuthenticate(retryCount: retryCount + 1);
+        if (reAuthSuccess) {
+          if (retryCount < 3) {
+            // Retry the request with new session
+            return updateRoute(
+              name: name,
+              routeId: routeId,
+              boardingId: boardingId,
+              droppingId: droppingId,
+              fleetId: fleetId,
+              startTime: startTime,
+              endTime: endTime,
+              routeLines: routeLines,
+            );
+          } else {
+            print('❌ [RouteService] Max retries reached for updateRoute.');
+            return {
+              'status': false,
+              'message': 'Authentication failed. Please login again.',
+            };
+          }
+        }
+      }
+
       print('📥 [RouteService] Update response status: ${response.statusCode}');
       print('📥 [RouteService] Update response body: ${response.body}');
 
@@ -353,24 +409,32 @@ class RouteService {
         );
         final reAuthSuccess = await _reAuthenticate();
         if (reAuthSuccess) {
-          print(
-            '✅ [RouteService] Re-authentication successful, retrying update...',
-          );
+          if (retryCount < 3) {
+            print(
+              '✅ [RouteService] Re-authentication successful, retrying update...',
+            );
 
-          print(
-            '✅ [RouteService] Payload: ${jsonEncode({'name': name, 'boarding_id': boardingId, 'dropping_id': droppingId, 'fleet_id': fleetId, 'str_time': convertTimeFormat(startTime), 'end_time': convertTimeFormat(endTime), 'route_lines': routeLines})}',
-          );
+            print(
+              '✅ [RouteService] Payload: ${jsonEncode({'name': name, 'boarding_id': boardingId, 'dropping_id': droppingId, 'fleet_id': fleetId, 'str_time': convertTimeFormat(startTime), 'end_time': convertTimeFormat(endTime), 'route_lines': routeLines})}',
+            );
 
-          return updateRoute(
-            name: name,
-            routeId: routeId,
-            boardingId: boardingId,
-            droppingId: droppingId,
-            fleetId: fleetId,
-            startTime: startTime,
-            endTime: endTime,
-            routeLines: routeLines,
-          );
+            return updateRoute(
+              name: name,
+              routeId: routeId,
+              boardingId: boardingId,
+              droppingId: droppingId,
+              fleetId: fleetId,
+              startTime: startTime,
+              endTime: endTime,
+              routeLines: routeLines,
+            );
+          } else {
+            print('❌ [RouteService] Max retries reached for updateRoute.');
+            return {
+              'status': false,
+              'message': 'Authentication failed. Please login again.',
+            };
+          }
         } else {
           print('❌ [RouteService] Re-authentication failed');
           return {'status': false, 'message': 'Failed to re-authenticate'};
